@@ -1,0 +1,14 @@
+{
+  "name": "socket_server",
+  "version": "1.0.0",
+  "devDependencies": {
+    "typescript": "^4.8.3"
+  },
+  "dependencies": {
+    "socket.io": "^4.5.2",
+    "socket.io-client": "^4.5.2",
+    "@pierogi.dev/readable_time": "^1.0.6",
+    "dotenv": "^16.0.2"
+  },
+  "type": "module"
+}
