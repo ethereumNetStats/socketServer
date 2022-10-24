@@ -24,7 +24,7 @@ type recordOfEthDB = {
     noRecordFlag: boolean,
 };
 
-type minutelyAddressCount = {
+type numberOfAddress = {
     startTimeReadable: string,
     endTimeReadable: string,
     startTimeUnix: number,
@@ -33,6 +33,8 @@ type minutelyAddressCount = {
     noRecordFlag: boolean,
 };
 
-type minutelyNetStats = recordOfEthDB & Pick<minutelyAddressCount, "numberOfAddress">
+type netStats = recordOfEthDB & Pick<numberOfAddress, "numberOfAddress">;
 
-export type {blockNumberWithTimestamp, recordOfEthDB, minutelyAddressCount, minutelyNetStats}
+type netStatsArray = Array<netStats>;
+
+export type {blockNumberWithTimestamp, recordOfEthDB, numberOfAddress, netStats, netStatsArray}
