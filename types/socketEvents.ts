@@ -14,10 +14,14 @@ type ClientToServerEvents = {
     dailyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
     dailyAddressCountRecorded: (dailyAddressCount: numberOfAddress) => void,
 
+    weeklyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
+    weeklyAddressCountRecorded: (weeklyAddressCount: numberOfAddress) => void,
+
     //Events with the dataPoolServer socket client.
-    requestInitialMinutelyNetStats: (ack: Function) => void,
+    requestInitialMinutelyNetStats: () => void,
     requestInitialHourlyNetStats: () => void,
     requestInitialDailyNetStats: () => void,
+    requestInitialWeeklyNetStats: () => void,
 }
 
 type ServerToClientEvents = {
@@ -34,6 +38,9 @@ type ServerToClientEvents = {
 
     initialDailyNetStats: (dailyNetStatsArray: netStatsArray) => void,
     newDailyNetStats: (dailyNetStats: netStats) => void,
+
+    initialWeeklyNetStats: (dailyNetStatsArray: netStatsArray) => void,
+    newWeeklyNetStats: (dailyNetStats: netStats) => void,
 }
 
 export type {ClientToServerEvents, ServerToClientEvents}

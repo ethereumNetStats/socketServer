@@ -31,10 +31,12 @@ const socketServer: Server<ClientToServerEvents, ServerToClientEvents> = new Ser
 let minutelyBasicNetStatsMakerId: string = '';
 let hourlyBasicNetStatsMakerId: string = '';
 let dailyBasicNetStatsMakerId: string = '';
+let weeklyBasicNetStatsMakerId: string = '';
 
 let minutelyAddressCounterId: string = '';
 let hourlyAddressCounterId: string = '';
 let dailyAddressCounterId: string = '';
+let weeklyAddressCounterId: string = '';
 
 let blockDataRecorderId: string = '';
 let newAddressRecorderId: string = '';
@@ -44,10 +46,12 @@ let socketClientId: string = '';
 const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsMaker';
 const hourlyBasicNetStatsMakerName: string = 'hourlyBasicNetStatsMaker';
 const dailyBasicNetStatsMakerName: string = 'dailyBasicNetStatsMaker';
+const weeklyBasicNetStatsMakerName: string = 'weeklyBasicNetStatsMaker';
 
 const minutelyAddressCounterName: string = 'minutelyAddressCounter';
 const hourlyAddressCounterName: string = 'hourlyAddressCounter';
 const dailyAddressCounterName: string = 'dailyAddressCounter';
+const weeklyAddressCounterName: string = 'weeklyAddressCounter';
 
 const blockDataRecorderName: string = 'blockDataRecorder';
 const newAddressRecorderName: string = 'newAddressRecorder';
@@ -68,6 +72,11 @@ let dailyBasicNetStatsDate: number | null;
 let dailyBasicNetStatsData: recordOfEthDB | null;
 let dailyAddressCountDate: number | null;
 let dailyAddressCountData: numberOfAddress | null;
+
+let weeklyBasicNetStatsDate: number | null;
+let weeklyBasicNetStatsData: recordOfEthDB | null;
+let weeklyAddressCountDate: number | null;
+let weeklyAddressCountData: numberOfAddress | null;
 
 
 socketServer.on('connection', (client) => {
@@ -91,6 +100,11 @@ socketServer.on('connection', (client) => {
             console.log(`${currentTimeReadable()} | Connect : ${dailyBasicNetStatsMakerName}`);
             break;
 
+        case weeklyBasicNetStatsMakerName:
+            weeklyBasicNetStatsMakerId = client.id;
+            console.log(`${currentTimeReadable()} | Connect : ${weeklyBasicNetStatsMakerName}`);
+            break;
+
         case minutelyAddressCounterName:
             minutelyAddressCounterId = client.id;
             console.log(`${currentTimeReadable()} | Connect : ${minutelyAddressCounterName}`);
@@ -104,6 +118,10 @@ socketServer.on('connection', (client) => {
         case dailyAddressCounterName:
             dailyAddressCounterId = client.id;
             console.log(`${currentTimeReadable()} | Connect : ${dailyAddressCounterName}`);
+            break;
+
+        case weeklyAddressCounterName:
+            weeklyAddressCounterId = client.id;
             break;
 
         case blockDataRecorderName:
@@ -130,6 +148,8 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> hourlyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(dailyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> dailyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
+        socketServer.to(weeklyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
+        console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
     });
 
     //Listener for the new address recorder.
@@ -140,6 +160,8 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Proxy : newAddressRecorder -> hourlyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`);
         socketServer.to(dailyAddressCounterId).emit("addressChecked", blockNumber);
         console.log(`${currentTimeReadable()} | Proxy : newAddressRecorder -> dailyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`);
+        socketServer.to(weeklyAddressCounterId).emit("addressChecked", blockNumber);
+        console.log(`${currentTimeReadable()} | Proxy : newAddressRecorder -> weeklyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`);
     });
 
     //
@@ -336,7 +358,7 @@ socketServer.on('connection', (client) => {
     //Listener for the minutely address counter.
     client.on("dailyAddressCountRecorded", (dailyAddressCount: numberOfAddress) => {
 
-        console.log(`${currentTimeReadable()} | Receive : 'hourlyAddressCountRecorded' | From : hourlyAddressCountRecorder`);
+        console.log(`${currentTimeReadable()} | Receive : 'dailyAddressCountRecorded' | From : dailyAddressCountRecorder`);
 
         dailyAddressCountData = dailyAddressCount;
         dailyAddressCountDate = dailyAddressCount.startTimeUnix;
@@ -387,6 +409,88 @@ socketServer.on('connection', (client) => {
 
         socketServer.to(socketClientId).emit("initialDailyNetStats", initialDailyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
+    });
+
+    //
+    //Weekly events emitter and recorder
+    //"weeklyAddressCountRecorded" & "weeklyBasicNetStatsRecorded" are exclusive events.
+    //
+
+    //Listener for the minutely net stats.
+    client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: recordOfEthDB) => {
+
+        console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
+
+        weeklyBasicNetStatsData = recordOfEthDB;
+        weeklyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+
+        if (weeklyBasicNetStatsData && weeklyAddressCountData) {
+            if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
+                let newDailyNetStats: netStats = {
+                    ...recordOfEthDB,
+                    numberOfAddress: weeklyAddressCountData.numberOfAddress,
+                }
+                client.to(socketClientId).emit('newHourlyNetStats', newDailyNetStats);
+                weeklyBasicNetStatsData = null;
+                weeklyAddressCountData = null;
+            }
+        }
+    });
+
+    //Listener for the minutely address counter.
+    client.on("weeklyAddressCountRecorded", (weeklyAddressCount: numberOfAddress) => {
+
+        console.log(`${currentTimeReadable()} | Receive : 'weeklyAddressCountRecorded' | From : weeklyAddressCountRecorder`);
+
+        weeklyAddressCountData = weeklyAddressCount;
+        weeklyAddressCountDate = weeklyAddressCount.startTimeUnix;
+
+        if (weeklyAddressCountData && weeklyBasicNetStatsData) {
+            if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
+                let newWeeklyNetStats: netStats = {
+                    ...weeklyBasicNetStatsData,
+                    numberOfAddress: weeklyAddressCount.numberOfAddress,
+                }
+                client.to(socketClientId).emit('newWeeklyNetStats', newWeeklyNetStats);
+                console.log(`${currentTimeReadable()} | Emit : 'newWeeklyNetStats' | To : dataPoolServer`);
+                weeklyBasicNetStatsData = null;
+                weeklyAddressCountData = null;
+            }
+        }
+    });
+
+    //Listener for a socketClient of the dataPoolServer.
+    client.on("requestInitialWeeklyNetStats", async () => {
+        console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                      FROM weeklyAddressCount
+                                                                      ORDER BY endTimeUnix DESC
+                                                                      LIMIT 8`);
+
+        let weeklyAddressCount: Array<numberOfAddress> = mysqlRes[0];
+
+        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                  FROM ethereum.weeklyBasicNetStats
+                                                                  WHERE endTimeUnix <= ${weeklyAddressCount[0].endTimeUnix}
+                                                                  ORDER BY endTimeUnix DESC
+                                                                  LIMIT 8`);
+
+        let weeklyBasicInitialNetStats: Array<recordOfEthDB> = mysqlRes[0];
+
+        let initialWeeklyNetStats: netStatsArray = [];
+
+        for (let i = 0; i < weeklyAddressCount.length; i++) {
+            initialWeeklyNetStats.push({
+                ...weeklyBasicInitialNetStats[i],
+                numberOfAddress: weeklyAddressCount[i].numberOfAddress,
+            });
+        }
+
+        initialWeeklyNetStats.reverse();
+
+        socketServer.to(socketClientId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
+        console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
     });
 
 });
