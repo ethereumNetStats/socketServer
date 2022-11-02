@@ -17,7 +17,7 @@ import type {
     numberOfAddress,
     netStats,
     netStatsArray,
-    recordOfEthDB,
+    basicNetStats, blockDataArray, blockData,
 } from "./types/types";
 
 import type {Pool} from "@pierogi.dev/get_mysql_connection";
@@ -59,22 +59,22 @@ const dataPoolServerName: string = "dataPoolServer";
 
 //Define control minutely data emitter variables.
 let minutelyBasicNetStatsDate: number | null;
-let minutelyBasicNetStatsData: recordOfEthDB | null;
+let minutelyBasicNetStatsData: basicNetStats | null;
 let minutelyAddressCountDate: number | null;
 let minutelyAddressCountData: numberOfAddress | null;
 
 let hourlyBasicNetStatsDate: number | null;
-let hourlyBasicNetStatsData: recordOfEthDB | null;
+let hourlyBasicNetStatsData: basicNetStats | null;
 let hourlyAddressCountDate: number | null;
 let hourlyAddressCountData: numberOfAddress | null;
 
 let dailyBasicNetStatsDate: number | null;
-let dailyBasicNetStatsData: recordOfEthDB | null;
+let dailyBasicNetStatsData: basicNetStats | null;
 let dailyAddressCountDate: number | null;
 let dailyAddressCountData: numberOfAddress | null;
 
 let weeklyBasicNetStatsDate: number | null;
-let weeklyBasicNetStatsData: recordOfEthDB | null;
+let weeklyBasicNetStatsData: basicNetStats | null;
 let weeklyAddressCountDate: number | null;
 let weeklyAddressCountData: numberOfAddress | null;
 
@@ -141,7 +141,7 @@ socketServer.on('connection', (client) => {
     }
 
     //Listener for the block data recorder.
-    client.on("newBlockDataRecorded", (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
+    client.on("newBlockDataRecorded", async(blockNumberWithTimestamp: blockNumberWithTimestamp) => {
         socketServer.to(minutelyBasicNetStatsMakerId).emit("newBlockDataRecorded", blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(hourlyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
@@ -150,6 +150,13 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> dailyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(weeklyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData WHERE number=${blockNumberWithTimestamp.blockNumber}`);
+
+        let newBlockData: blockData = mysqlRes[0];
+
+        socketServer.to(socketClientId).emit('newBlockData', newBlockData);
+        console.log(`${currentTimeReadable()} | Emit : 'newBlockData' | To : dataPoolServer`);
     });
 
     //Listener for the new address recorder.
@@ -170,7 +177,7 @@ socketServer.on('connection', (client) => {
     //
 
     //Listener for the minutely net stats.
-    client.on("minutelyBasicNetStatsRecorded", (recordOfEthDB: recordOfEthDB) => {
+    client.on("minutelyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Receive : 'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
 
@@ -230,7 +237,7 @@ socketServer.on('connection', (client) => {
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 61`);
 
-        let minutelyBasicInitialNetStats: Array<recordOfEthDB> = mysqlRes[0];
+        let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
         let initialMinutelyNetStats: netStatsArray = [];
 
@@ -253,7 +260,7 @@ socketServer.on('connection', (client) => {
     //
 
     //Listener for the minutely net stats.
-    client.on("hourlyBasicNetStatsRecorded", (recordOfEthDB: recordOfEthDB) => {
+    client.on("hourlyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`);
 
@@ -312,7 +319,7 @@ socketServer.on('connection', (client) => {
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 25`);
 
-        let hourlyBasicInitialNetStats: Array<recordOfEthDB> = mysqlRes[0];
+        let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
         let initialHourlyNetStats: netStatsArray = [];
 
@@ -335,7 +342,7 @@ socketServer.on('connection', (client) => {
     //
 
     //Listener for the minutely net stats.
-    client.on("dailyBasicNetStatsRecorded", (recordOfEthDB: recordOfEthDB) => {
+    client.on("dailyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`);
 
@@ -394,7 +401,7 @@ socketServer.on('connection', (client) => {
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 8`);
 
-        let dailyBasicInitialNetStats: Array<recordOfEthDB> = mysqlRes[0];
+        let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
         let initialDailyNetStats: netStatsArray = [];
 
@@ -417,7 +424,7 @@ socketServer.on('connection', (client) => {
     //
 
     //Listener for the minutely net stats.
-    client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: recordOfEthDB) => {
+    client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
 
@@ -430,7 +437,7 @@ socketServer.on('connection', (client) => {
                     ...recordOfEthDB,
                     numberOfAddress: weeklyAddressCountData.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newHourlyNetStats', newDailyNetStats);
+                client.to(socketClientId).emit('newWeeklyNetStats', newDailyNetStats);
                 weeklyBasicNetStatsData = null;
                 weeklyAddressCountData = null;
             }
@@ -466,7 +473,7 @@ socketServer.on('connection', (client) => {
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM weeklyAddressCount
                                                                       ORDER BY endTimeUnix DESC
-                                                                      LIMIT 8`);
+                                                                      LIMIT 25`);
 
         let weeklyAddressCount: Array<numberOfAddress> = mysqlRes[0];
 
@@ -474,9 +481,9 @@ socketServer.on('connection', (client) => {
                                                                   FROM ethereum.weeklyBasicNetStats
                                                                   WHERE endTimeUnix <= ${weeklyAddressCount[0].endTimeUnix}
                                                                   ORDER BY endTimeUnix DESC
-                                                                  LIMIT 8`);
+                                                                  LIMIT 25`);
 
-        let weeklyBasicInitialNetStats: Array<recordOfEthDB> = mysqlRes[0];
+        let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
         let initialWeeklyNetStats: netStatsArray = [];
 
@@ -491,6 +498,18 @@ socketServer.on('connection', (client) => {
 
         socketServer.to(socketClientId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
+    });
+
+    //Listener for the socket client of the dataPoolServer regarding blockData.
+    client.on("requestInitialBlockData", async() => {
+        console.log(`${currentTimeReadable()} | Receive : 'requestInitialBlockData' | From : dataPoolServer`);
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData ORDER BY number DESC LIMIT 10`);
+
+        let initialBlockData: blockDataArray = mysqlRes[0];
+
+        socketServer.to(socketClientId).emit("initialBlockData", initialBlockData);
+        console.log(`${currentTimeReadable()} | Emit : 'initialBlockData' | To : dataPoolServer`);
     });
 
 });

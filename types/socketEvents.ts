@@ -1,20 +1,20 @@
-import {netStatsArray, blockNumberWithTimestamp, recordOfEthDB, numberOfAddress, netStats} from "./types";
+import {netStatsArray, blockNumberWithTimestamp, basicNetStats, numberOfAddress, netStats, blockData, blockDataArray} from "./types";
 
 type ClientToServerEvents = {
     //Events with backend socket clients.
     newBlockDataRecorded: (blockNumberWithTimestamp: blockNumberWithTimestamp) => void,
     addressChecked: (blockNumber: number) => void,
 
-    minutelyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
+    minutelyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void,
     minutelyAddressCountRecorded: (minutelyAddressCount: numberOfAddress) => void,
 
-    hourlyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
+    hourlyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void,
     hourlyAddressCountRecorded: (hourlyAddressCount: numberOfAddress) => void,
 
-    dailyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
+    dailyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void,
     dailyAddressCountRecorded: (dailyAddressCount: numberOfAddress) => void,
 
-    weeklyBasicNetStatsRecorded: (recordOfEthDB: recordOfEthDB) => void,
+    weeklyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void,
     weeklyAddressCountRecorded: (weeklyAddressCount: numberOfAddress) => void,
 
     //Events with the dataPoolServer socket client.
@@ -22,6 +22,8 @@ type ClientToServerEvents = {
     requestInitialHourlyNetStats: () => void,
     requestInitialDailyNetStats: () => void,
     requestInitialWeeklyNetStats: () => void,
+
+    requestInitialBlockData: () => void,
 }
 
 type ServerToClientEvents = {
@@ -41,6 +43,9 @@ type ServerToClientEvents = {
 
     initialWeeklyNetStats: (dailyNetStatsArray: netStatsArray) => void,
     newWeeklyNetStats: (dailyNetStats: netStats) => void,
+
+    initialBlockData: (blockDataArray: blockDataArray) => void,
+    newBlockData: (blockData: blockData) => void,
 }
 
 export type {ClientToServerEvents, ServerToClientEvents}
