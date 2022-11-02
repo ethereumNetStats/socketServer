@@ -78,7 +78,6 @@ let weeklyBasicNetStatsData: basicNetStats | null;
 let weeklyAddressCountDate: number | null;
 let weeklyAddressCountData: numberOfAddress | null;
 
-
 socketServer.on('connection', (client) => {
     console.log(`${currentTimeReadable()} | Connect with a socket client. ID : ${client.id}`);
 
@@ -122,6 +121,7 @@ socketServer.on('connection', (client) => {
 
         case weeklyAddressCounterName:
             weeklyAddressCounterId = client.id;
+            console.log(`${currentTimeReadable()} | Connect : ${weeklyAddressCounterName}`);
             break;
 
         case blockDataRecorderName:
@@ -151,7 +151,7 @@ socketServer.on('connection', (client) => {
         socketServer.to(weeklyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
 
-        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData WHERE number=${blockNumberWithTimestamp.blockNumber}`);
+        let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData WHERE number=${blockNumberWithTimestamp.blockNumber}`);
 
         let newBlockData: blockData = mysqlRes[0];
 
