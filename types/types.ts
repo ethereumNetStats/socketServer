@@ -48,6 +48,7 @@ type numberOfAddress = {
 };
 
 type blockData = {
+    id?: number,
     number: number,
     hash: string,
     parentHash: string,
@@ -77,4 +78,51 @@ type netStats = basicNetStats & Pick<numberOfAddress, "numberOfAddress">;
 
 type netStatsArray = Array<netStats>;
 
-export type {blockNumberWithTimestamp, basicNetStats, numberOfAddress, netStats, netStatsArray, blockData, blockDataArray}
+type requestBlockDetail = {
+    number: number,
+    frontendId: string,
+}
+
+type requestBlockList = {
+    pageOffset: number,
+    frontendId: string,
+}
+
+type responseBlockDetail = Pick<requestBlockDetail, "frontendId"> & blockData & {
+    noRecord: boolean,
+};
+
+type responseBlockList = {
+    list: Array<blockData>,
+    latestBlockNumber: number,
+    totalPage: number,
+    currentPage: number,
+    topBlockNumber: number,
+    lastBlockNumber: number,
+    itemsPerPage: number,
+    pageOffset: number,
+    frontendId: string,
+}
+
+type requestBlockListPageByBlockNumber = {
+    blockNumber: number,
+    frontendId: string,
+};
+
+type responseBlockListPageByBlockNumber = responseBlockList;
+
+export type {
+    blockNumberWithTimestamp,
+    basicNetStats,
+    numberOfAddress,
+    netStats,
+    netStatsArray,
+    blockData,
+    blockDataArray,
+    requestBlockDetail,
+    responseBlockDetail,
+    responseBlockList,
+    requestBlockList,
+    requestBlockListPageByBlockNumber,
+    responseBlockListPageByBlockNumber
+}

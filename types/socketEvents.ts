@@ -1,4 +1,15 @@
-import {netStatsArray, blockNumberWithTimestamp, basicNetStats, numberOfAddress, netStats, blockData, blockDataArray} from "./types";
+import type {
+    netStatsArray,
+    blockNumberWithTimestamp,
+    basicNetStats,
+    numberOfAddress,
+    netStats,
+    blockData,
+    blockDataArray,
+    requestBlockDetail,
+    responseBlockDetail,
+    responseBlockList, requestBlockList, requestBlockListPageByBlockNumber, responseBlockListPageByBlockNumber
+} from "./types";
 
 type ClientToServerEvents = {
     //Events with backend socket clients.
@@ -24,6 +35,10 @@ type ClientToServerEvents = {
     requestInitialWeeklyNetStats: () => void,
 
     requestInitialBlockData: () => void,
+
+    requestBlockDetail: (requestBlockDetail: requestBlockDetail) => void,
+    requestBlockList: (requestBlockList: requestBlockList) => void,
+    requestBlockListPageByBlockNumber: (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) => void,
 }
 
 type ServerToClientEvents = {
@@ -46,6 +61,10 @@ type ServerToClientEvents = {
 
     initialBlockData: (blockDataArray: blockDataArray) => void,
     newBlockData: (blockData: blockData) => void,
+
+    responseBlockDetail: (responseBlockDetail: responseBlockDetail) => void,
+    responseBlockList: (responseBlockList: responseBlockList) => void,
+    responseBlockListPageByBlockNumber: (responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber) => void,
 }
 
 export type {ClientToServerEvents, ServerToClientEvents}

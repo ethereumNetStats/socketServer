@@ -17,7 +17,13 @@ import type {
     numberOfAddress,
     netStats,
     netStatsArray,
-    basicNetStats, blockDataArray, blockData,
+    basicNetStats,
+    blockDataArray,
+    blockData,
+    responseBlockDetail,
+    responseBlockList,
+    requestBlockListPageByBlockNumber,
+    responseBlockListPageByBlockNumber,
 } from "./types/types";
 
 import type {Pool} from "@pierogi.dev/get_mysql_connection";
@@ -40,7 +46,7 @@ let weeklyAddressCounterId: string = '';
 
 let blockDataRecorderId: string = '';
 let newAddressRecorderId: string = '';
-let socketClientId: string = '';
+let dataPoolServerId: string = '';
 
 //Define socket-io client name.
 const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsMaker';
@@ -57,22 +63,25 @@ const blockDataRecorderName: string = 'blockDataRecorder';
 const newAddressRecorderName: string = 'newAddressRecorder';
 const dataPoolServerName: string = "dataPoolServer";
 
-//Define control minutely data emitter variables.
+//Define variables for the minutely data handler.
 let minutelyBasicNetStatsDate: number | null;
 let minutelyBasicNetStatsData: basicNetStats | null;
 let minutelyAddressCountDate: number | null;
 let minutelyAddressCountData: numberOfAddress | null;
 
+//Define variables for the hourly data handler.
 let hourlyBasicNetStatsDate: number | null;
 let hourlyBasicNetStatsData: basicNetStats | null;
 let hourlyAddressCountDate: number | null;
 let hourlyAddressCountData: numberOfAddress | null;
 
+//Define variables for the daily data handler.
 let dailyBasicNetStatsDate: number | null;
 let dailyBasicNetStatsData: basicNetStats | null;
 let dailyAddressCountDate: number | null;
 let dailyAddressCountData: numberOfAddress | null;
 
+//Define variables for the weekly data handler.
 let weeklyBasicNetStatsDate: number | null;
 let weeklyBasicNetStatsData: basicNetStats | null;
 let weeklyAddressCountDate: number | null;
@@ -135,13 +144,13 @@ socketServer.on('connection', (client) => {
             break;
 
         case dataPoolServerName:
-            socketClientId = client.id;
+            dataPoolServerId = client.id;
             console.log(`${currentTimeReadable()} | Connect : ${dataPoolServerName}`);
             break;
     }
 
     //Listener for the block data recorder.
-    client.on("newBlockDataRecorded", async(blockNumberWithTimestamp: blockNumberWithTimestamp) => {
+    client.on("newBlockDataRecorded", async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
         socketServer.to(minutelyBasicNetStatsMakerId).emit("newBlockDataRecorded", blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(hourlyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
@@ -151,11 +160,13 @@ socketServer.on('connection', (client) => {
         socketServer.to(weeklyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
 
-        let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData WHERE number=${blockNumberWithTimestamp.blockNumber}`);
+        let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                        FROM blockData
+                                                                        WHERE number = ${blockNumberWithTimestamp.blockNumber}`);
 
         let newBlockData: blockData = mysqlRes[0];
 
-        socketServer.to(socketClientId).emit('newBlockData', newBlockData);
+        socketServer.to(dataPoolServerId).emit('newBlockData', newBlockData);
         console.log(`${currentTimeReadable()} | Emit : 'newBlockData' | To : dataPoolServer`);
     });
 
@@ -190,7 +201,7 @@ socketServer.on('connection', (client) => {
                     ...recordOfEthDB,
                     numberOfAddress: minutelyAddressCountData.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newMinutelyNetStats', newMinutelyNetStats);
+                client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
                 console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
                 minutelyBasicNetStatsData = null;
                 minutelyAddressCountData = null;
@@ -212,7 +223,7 @@ socketServer.on('connection', (client) => {
                     ...minutelyBasicNetStatsData,
                     numberOfAddress: minutelyAddressCount.numberOfAddress,
                 }
-                client.timeout(5000).to(socketClientId).emit('newMinutelyNetStats', newMinutelyNetStats);
+                client.timeout(5000).to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
                 console.log(`${currentTimeReadable()} | Emit : 'newMinutelyNetStats' | To : dataPoolServer | Trigger event : 'minutelyAddressCountRecorded'`);
                 minutelyBasicNetStatsData = null;
                 minutelyAddressCountData = null;
@@ -250,7 +261,7 @@ socketServer.on('connection', (client) => {
 
         initialMinutelyNetStats.reverse();
 
-        socketServer.to(socketClientId).emit("initialMinutelyNetStats", initialMinutelyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", initialMinutelyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
     });
 
@@ -273,7 +284,7 @@ socketServer.on('connection', (client) => {
                     ...recordOfEthDB,
                     numberOfAddress: hourlyAddressCountData.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newHourlyNetStats', newHourlyNetStats);
+                client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
                 hourlyBasicNetStatsData = null;
                 hourlyAddressCountData = null;
             }
@@ -294,7 +305,7 @@ socketServer.on('connection', (client) => {
                     ...hourlyBasicNetStatsData,
                     numberOfAddress: hourlyAddressCount.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newHourlyNetStats', newHourlyNetStats);
+                client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
                 console.log(`${currentTimeReadable()} | Emit : 'newHourlyNetStats' | To : dataPoolServer`);
                 hourlyBasicNetStatsData = null;
                 hourlyAddressCountData = null;
@@ -332,7 +343,7 @@ socketServer.on('connection', (client) => {
 
         initialHourlyNetStats.reverse();
 
-        socketServer.to(socketClientId).emit("initialHourlyNetStats", initialHourlyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", initialHourlyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
     });
 
@@ -355,7 +366,7 @@ socketServer.on('connection', (client) => {
                     ...recordOfEthDB,
                     numberOfAddress: dailyAddressCountData.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newHourlyNetStats', newDailyNetStats);
+                client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
                 dailyBasicNetStatsData = null;
                 dailyAddressCountData = null;
             }
@@ -376,7 +387,7 @@ socketServer.on('connection', (client) => {
                     ...dailyBasicNetStatsData,
                     numberOfAddress: dailyAddressCount.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newDailyNetStats', newDailyNetStats);
+                client.to(dataPoolServerId).emit('newDailyNetStats', newDailyNetStats);
                 console.log(`${currentTimeReadable()} | Emit : 'newDailyNetStats' | To : dataPoolServer`);
                 dailyBasicNetStatsData = null;
                 dailyAddressCountData = null;
@@ -414,7 +425,7 @@ socketServer.on('connection', (client) => {
 
         initialDailyNetStats.reverse();
 
-        socketServer.to(socketClientId).emit("initialDailyNetStats", initialDailyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialDailyNetStats", initialDailyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
     });
 
@@ -437,7 +448,7 @@ socketServer.on('connection', (client) => {
                     ...recordOfEthDB,
                     numberOfAddress: weeklyAddressCountData.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newWeeklyNetStats', newDailyNetStats);
+                client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
                 weeklyBasicNetStatsData = null;
                 weeklyAddressCountData = null;
             }
@@ -458,7 +469,7 @@ socketServer.on('connection', (client) => {
                     ...weeklyBasicNetStatsData,
                     numberOfAddress: weeklyAddressCount.numberOfAddress,
                 }
-                client.to(socketClientId).emit('newWeeklyNetStats', newWeeklyNetStats);
+                client.to(dataPoolServerId).emit('newWeeklyNetStats', newWeeklyNetStats);
                 console.log(`${currentTimeReadable()} | Emit : 'newWeeklyNetStats' | To : dataPoolServer`);
                 weeklyBasicNetStatsData = null;
                 weeklyAddressCountData = null;
@@ -496,20 +507,182 @@ socketServer.on('connection', (client) => {
 
         initialWeeklyNetStats.reverse();
 
-        socketServer.to(socketClientId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
     });
 
     //Listener for the socket client of the dataPoolServer regarding blockData.
-    client.on("requestInitialBlockData", async() => {
+    client.on("requestInitialBlockData", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestInitialBlockData' | From : dataPoolServer`);
 
-        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT * FROM blockData ORDER BY number DESC LIMIT 10`);
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                      FROM blockData
+                                                                      ORDER BY number DESC
+                                                                      LIMIT 10`);
 
         let initialBlockData: blockDataArray = mysqlRes[0];
 
-        socketServer.to(socketClientId).emit("initialBlockData", initialBlockData);
+        socketServer.to(dataPoolServerId).emit("initialBlockData", initialBlockData);
         console.log(`${currentTimeReadable()} | Emit : 'initialBlockData' | To : dataPoolServer`);
+    });
+
+    //Listener for the requestBlockDetail event.
+    client.on("requestBlockDetail", async (requestBlockDetail) => {
+        console.log(`${currentTimeReadable()} | Receive : 'requestBlockDetail' | From : dataPoolServer | FrontendId : ${requestBlockDetail.frontendId}`);
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                      FROM blockData
+                                                                      WHERE number = ${requestBlockDetail.number}`);
+
+        if (mysqlRes[0].length) {
+
+            let responseBlockDetail: responseBlockDetail = mysqlRes[0][0];
+            responseBlockDetail.frontendId = requestBlockDetail.frontendId;
+            responseBlockDetail.noRecord = false;
+
+            socketServer.to(dataPoolServerId).emit('responseBlockDetail', (responseBlockDetail));
+            console.log(`${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${responseBlockDetail.noRecord}`);
+
+        } else {
+
+            let responseBlockDetail: responseBlockDetail = mysqlRes[0][0];
+            responseBlockDetail.frontendId = requestBlockDetail.frontendId;
+            responseBlockDetail.noRecord = true;
+
+            socketServer.to(dataPoolServerId).emit('responseBlockDetail', (responseBlockDetail));
+            console.log(`${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${responseBlockDetail.noRecord}`);
+        }
+
+    });
+
+    //Listener for the requestBlockList event.
+    client.on('requestBlockList', async (requestBlockList) => {
+        console.log(`${currentTimeReadable()} | Receive : 'requestBlockList' | From : dataPoolServer`);
+
+        const itemsPerPage: number = 25;
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
+                                                                      FROM blockData
+                                                                      ORDER BY number DESC
+                                                                      LIMIT 1`);
+
+        let latestBlockNumber: number = mysqlRes[0][0].number;
+
+        let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage);
+
+        let topBlockNumber: number = latestBlockNumber - (itemsPerPage * requestBlockList.pageOffset);
+
+        let lastBlockNumber: number = topBlockNumber - itemsPerPage;
+
+        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                  FROM blockData
+                                                                  WHERE number >= ${lastBlockNumber}
+                                                                    AND number < ${topBlockNumber}
+                                                                  ORDER BY number DESC`);
+
+        let responseBlockList: responseBlockList = {
+            itemsPerPage: 0,
+            lastBlockNumber: 0,
+            latestBlockNumber: 0,
+            list: [],
+            pageOffset: 0,
+            topBlockNumber: 0,
+            totalPage: 0,
+            currentPage: 0,
+            frontendId: ''
+        };
+
+        responseBlockList.list = mysqlRes[0];
+        responseBlockList.latestBlockNumber = latestBlockNumber;
+        responseBlockList.totalPage = totalPage;
+        responseBlockList.currentPage = requestBlockList.pageOffset;
+        responseBlockList.topBlockNumber = topBlockNumber;
+        responseBlockList.lastBlockNumber = lastBlockNumber;
+        responseBlockList.itemsPerPage = itemsPerPage;
+        responseBlockList.pageOffset = requestBlockList.pageOffset;
+        responseBlockList.frontendId = requestBlockList.frontendId;
+
+        socketServer.to(dataPoolServerId).emit('responseBlockList', responseBlockList);
+        console.log(`${currentTimeReadable()} | Emit : 'responseBlockList' | To : dataPoolServer`);
+
+    });
+
+    //Listener for the requestBlockListPageByBlockNumber event.
+    client.on('requestBlockListPageByBlockNumber', async (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) => {
+
+        console.log(`${currentTimeReadable()} | Input block number : ${requestBlockListPageByBlockNumber.blockNumber}`);
+
+        const itemsPerPage: number = 25;
+
+        let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
+                                                                      FROM blockData
+                                                                      ORDER BY number DESC
+                                                                      LIMIT 1`);
+
+        let latestBlockNumber: number = mysqlRes[0][0].number;
+
+        console.log(`${currentTimeReadable()} | latestBlockNumber : ${latestBlockNumber}`);
+
+        let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage);
+
+        console.log(`${currentTimeReadable()} | totalPage : ${totalPage}`);
+
+        let currentPage: number = totalPage - (Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage));
+
+        // for (let i = 0; i < totalPage; i++) {
+        //     console.log(`${currentTimeReadable()} | i : ${i}`);
+        //     console.log(`${currentTimeReadable()} | requestBlockListPageByBlockNumber.blockNumber : ${requestBlockListPageByBlockNumber.blockNumber}`);
+        //     console.log(`${currentTimeReadable()} | latestBlockNumber - (itemsPerPage * i) | ${latestBlockNumber - (itemsPerPage * i)}`);
+        //     if (latestBlockNumber - (itemsPerPage * i) < requestBlockListPageByBlockNumber.blockNumber) {
+        //         console.log(`${currentTimeReadable()} | currentPage : ${currentPage}`);
+        //         currentPage = i - 1;
+        //         break;
+        //     }
+        // }
+        //
+        // console.log(`${currentTimeReadable()} | blockNumber / itemsPerPage : ${Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage)}`);
+        // console.log(`${currentTimeReadable()} | new currentPage : ${totalPage - (Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage))}`);
+
+        console.log(`${currentTimeReadable()} | currentPage : ${currentPage}`);
+
+        let topBlockNumber: number = (totalPage - currentPage) * itemsPerPage;
+
+        console.log(`${currentTimeReadable()} | topBlockNumber : ${topBlockNumber}`);
+
+        let lastBlockNumber: number = topBlockNumber - itemsPerPage;
+
+        console.log(`${currentTimeReadable()} | lastBlockNumber : ${lastBlockNumber}`);
+
+        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                  FROM blockData
+                                                                  WHERE number >= ${lastBlockNumber}
+                                                                    AND number < ${topBlockNumber}
+                                                                  ORDER BY number DESC`);
+
+        let responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber = {
+            itemsPerPage: 0,
+            lastBlockNumber: 0,
+            latestBlockNumber: 0,
+            list: [],
+            pageOffset: 0,
+            topBlockNumber: 0,
+            totalPage: 0,
+            currentPage: 0,
+            frontendId: ''
+        };
+
+        responseBlockListPageByBlockNumber.list = mysqlRes[0];
+        responseBlockListPageByBlockNumber.latestBlockNumber = latestBlockNumber;
+        responseBlockListPageByBlockNumber.totalPage = totalPage;
+        responseBlockListPageByBlockNumber.currentPage = currentPage;
+        responseBlockListPageByBlockNumber.topBlockNumber = topBlockNumber;
+        responseBlockListPageByBlockNumber.lastBlockNumber = lastBlockNumber;
+        responseBlockListPageByBlockNumber.itemsPerPage = itemsPerPage;
+        responseBlockListPageByBlockNumber.pageOffset = currentPage;
+        responseBlockListPageByBlockNumber.frontendId = requestBlockListPageByBlockNumber.frontendId;
+
+        socketServer.to(dataPoolServerId).emit('responseBlockList', responseBlockListPageByBlockNumber);
+        console.log(`${currentTimeReadable()} | Emit : 'responseBlockListPageByBlockNumber' | To : dataPoolServer`);
     });
 
 });
