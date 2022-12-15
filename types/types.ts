@@ -43,7 +43,7 @@ type numberOfAddress = {
     endTimeReadable: string,
     startTimeUnix: number,
     endTimeUnix: number,
-    numberOfAddress: number,
+    numberOfAddress?: number,
     noRecordFlag: boolean,
 };
 

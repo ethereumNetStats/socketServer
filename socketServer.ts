@@ -16,7 +16,6 @@ import type {
     blockNumberWithTimestamp,
     numberOfAddress,
     netStats,
-    netStatsArray,
     basicNetStats,
     blockDataArray,
     blockData,
@@ -49,10 +48,10 @@ let newAddressRecorderId: string = '';
 let dataPoolServerId: string = '';
 
 //Define socket-io client name.
-const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsMaker';
-const hourlyBasicNetStatsMakerName: string = 'hourlyBasicNetStatsMaker';
-const dailyBasicNetStatsMakerName: string = 'dailyBasicNetStatsMaker';
-const weeklyBasicNetStatsMakerName: string = 'weeklyBasicNetStatsMaker';
+const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsRecorder';
+const hourlyBasicNetStatsMakerName: string = 'hourlyBasicNetStatsRecorder';
+const dailyBasicNetStatsMakerName: string = 'dailyBasicNetStatsRecorder';
+const weeklyBasicNetStatsMakerName: string = 'weeklyBasicNetStatsRecorder';
 
 const minutelyAddressCounterName: string = 'minutelyAddressCounter';
 const hourlyAddressCounterName: string = 'hourlyAddressCounter';
@@ -66,25 +65,25 @@ const dataPoolServerName: string = "dataPoolServer";
 //Define variables for the minutely data handler.
 let minutelyBasicNetStatsDate: number | null;
 let minutelyBasicNetStatsData: basicNetStats | null;
-let minutelyAddressCountDate: number | null;
+// let minutelyAddressCountDate: number | null;
 let minutelyAddressCountData: numberOfAddress | null;
 
 //Define variables for the hourly data handler.
 let hourlyBasicNetStatsDate: number | null;
 let hourlyBasicNetStatsData: basicNetStats | null;
-let hourlyAddressCountDate: number | null;
+// let hourlyAddressCountDate: number | null;
 let hourlyAddressCountData: numberOfAddress | null;
 
 //Define variables for the daily data handler.
 let dailyBasicNetStatsDate: number | null;
 let dailyBasicNetStatsData: basicNetStats | null;
-let dailyAddressCountDate: number | null;
+// let dailyAddressCountDate: number | null;
 let dailyAddressCountData: numberOfAddress | null;
 
 //Define variables for the weekly data handler.
 let weeklyBasicNetStatsDate: number | null;
 let weeklyBasicNetStatsData: basicNetStats | null;
-let weeklyAddressCountDate: number | null;
+// let weeklyAddressCountDate: number | null;
 let weeklyAddressCountData: numberOfAddress | null;
 
 socketServer.on('connection', (client) => {
@@ -151,6 +150,10 @@ socketServer.on('connection', (client) => {
 
     //Listener for the block data recorder.
     client.on("newBlockDataRecorded", async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
+
+        console.log(`${currentTimeReadable()} | Receive : 'newBlockDataRecorded'`);
+        console.log(blockNumberWithTimestamp);
+
         socketServer.to(minutelyBasicNetStatsMakerId).emit("newBlockDataRecorded", blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(hourlyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
@@ -188,80 +191,113 @@ socketServer.on('connection', (client) => {
     //
 
     //Listener for the minutely net stats.
-    client.on("minutelyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
-
-        console.log(`${currentTimeReadable()} | Receive : 'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
-
-        minutelyBasicNetStatsData = recordOfEthDB;
-        minutelyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
-
-        if (minutelyBasicNetStatsData && minutelyAddressCountData) {
-            if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
-                let newMinutelyNetStats: netStats = {
-                    ...recordOfEthDB,
-                    numberOfAddress: minutelyAddressCountData.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
-                console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
-                minutelyBasicNetStatsData = null;
-                minutelyAddressCountData = null;
-            }
-        }
-    });
+    // client.on("minutelyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Receive : 'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
+    //
+    //     minutelyBasicNetStatsData = recordOfEthDB;
+    //     minutelyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+    //
+    //     if (minutelyBasicNetStatsData && minutelyAddressCountData) {
+    //         if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
+    //             let newMinutelyNetStats: netStats = {
+    //                 ...recordOfEthDB,
+    //                 numberOfAddress: minutelyAddressCountData.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
+    //             console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
+    //             minutelyBasicNetStatsData = null;
+    //             minutelyAddressCountData = null;
+    //         }
+    //     }
+    // });
 
     //Listener for the minutely address counter.
-    client.on("minutelyAddressCountRecorded", (minutelyAddressCount: numberOfAddress) => {
+    // client.on("minutelyAddressCountRecorded", (minutelyAddressCount: numberOfAddress) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Receive : 'minutelyAddressCountRecorded' | From : minutelyAddressCounter`);
+    //
+    //     minutelyAddressCountData = minutelyAddressCount;
+    //     minutelyAddressCountDate = minutelyAddressCount.startTimeUnix;
+    //
+    //     if (minutelyAddressCountData && minutelyBasicNetStatsData) {
+    //         if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
+    //             let newMinutelyNetStats: netStats = {
+    //                 ...minutelyBasicNetStatsData,
+    //                 numberOfAddress: minutelyAddressCount.numberOfAddress,
+    //             }
+    //             client.timeout(5000).to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
+    //             console.log(`${currentTimeReadable()} | Emit : 'newMinutelyNetStats' | To : dataPoolServer | Trigger event : 'minutelyAddressCountRecorded'`);
+    //             minutelyBasicNetStatsData = null;
+    //             minutelyAddressCountData = null;
+    //         }
+    //     }
+    // });
 
-        console.log(`${currentTimeReadable()} | Receive : 'minutelyAddressCountRecorded' | From : minutelyAddressCounter`);
+    //Listener for the minutely net stats.
+    client.on("minutelyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
+        console.log(`${currentTimeReadable()} | Receive :'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
 
-        minutelyAddressCountData = minutelyAddressCount;
-        minutelyAddressCountDate = minutelyAddressCount.startTimeUnix;
+        minutelyBasicNetStatsData = basicNetStats;
+        minutelyBasicNetStatsDate = basicNetStats.startTimeUnix;
 
-        if (minutelyAddressCountData && minutelyBasicNetStatsData) {
-            if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
-                let newMinutelyNetStats: netStats = {
-                    ...minutelyBasicNetStatsData,
-                    numberOfAddress: minutelyAddressCount.numberOfAddress,
-                }
-                client.timeout(5000).to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
-                console.log(`${currentTimeReadable()} | Emit : 'newMinutelyNetStats' | To : dataPoolServer | Trigger event : 'minutelyAddressCountRecorded'`);
-                minutelyBasicNetStatsData = null;
-                minutelyAddressCountData = null;
-            }
+        let newMinutelyNetStats: netStats = {
+            ...basicNetStats,
         }
+
+        client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
+        console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
+        minutelyBasicNetStatsData = null;
+        minutelyAddressCountData = null;
     });
 
     //Listener for a socketClient of the dataPoolServer.
+    // client.on("requestInitialMinutelyNetStats", async () => {
+    //     console.log(`${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`);
+    //
+    //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                                   FROM minutelyAddressCount
+    //                                                                   ORDER BY endTimeUnix DESC
+    //                                                                   LIMIT 61`);
+    //
+    //     let minutelyAddressCount: Array<numberOfAddress> = mysqlRes[0];
+    //
+    //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                               FROM ethereum.minutelyBasicNetStats
+    //                                                               WHERE endTimeUnix <= ${minutelyAddressCount[0].endTimeUnix}
+    //                                                               ORDER BY endTimeUnix DESC
+    //                                                               LIMIT 61`);
+    //
+    //     let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
+    //
+    //     let initialMinutelyNetStats: netStatsArray = [];
+    //
+    //     for (let i = 0; i < minutelyAddressCount.length; i++) {
+    //         initialMinutelyNetStats.push({
+    //             ...minutelyBasicInitialNetStats[i],
+    //             numberOfAddress: minutelyAddressCount[i].numberOfAddress,
+    //         });
+    //     }
+    //
+    //     initialMinutelyNetStats.reverse();
+    //
+    //     socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", initialMinutelyNetStats);
+    //     console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
+    // });
+
     client.on("requestInitialMinutelyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM minutelyAddressCount
-                                                                      ORDER BY endTimeUnix DESC
-                                                                      LIMIT 61`);
-
-        let minutelyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-
-        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM ethereum.minutelyBasicNetStats
-                                                                  WHERE endTimeUnix <= ${minutelyAddressCount[0].endTimeUnix}
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 61`);
 
         let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
-        let initialMinutelyNetStats: netStatsArray = [];
+        minutelyBasicInitialNetStats.reverse();
 
-        for (let i = 0; i < minutelyAddressCount.length; i++) {
-            initialMinutelyNetStats.push({
-                ...minutelyBasicInitialNetStats[i],
-                numberOfAddress: minutelyAddressCount[i].numberOfAddress,
-            });
-        }
-
-        initialMinutelyNetStats.reverse();
-
-        socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", initialMinutelyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", minutelyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
     });
 
@@ -270,80 +306,113 @@ socketServer.on('connection', (client) => {
     //"hourlyAddressCountRecorded" & "hourlyBasicNetStatsRecorded" are exclusive events.
     //
 
-    //Listener for the minutely net stats.
-    client.on("hourlyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //Listener for the hourly net stats.
+    // client.on("hourlyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`);
+    //
+    //     hourlyBasicNetStatsData = recordOfEthDB;
+    //     hourlyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+    //
+    //     if (hourlyBasicNetStatsData && hourlyAddressCountData) {
+    //         if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
+    //             let newHourlyNetStats: netStats = {
+    //                 ...recordOfEthDB,
+    //                 numberOfAddress: hourlyAddressCountData.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
+    //             hourlyBasicNetStatsData = null;
+    //             hourlyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    //Listener for the hourly address counter.
+    // client.on("hourlyAddressCountRecorded", (hourlyAddressCount: numberOfAddress) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Receive : 'hourlyAddressCountRecorded' | From : hourlyAddressCountRecorder`);
+    //
+    //     hourlyAddressCountData = hourlyAddressCount;
+    //     hourlyAddressCountDate = hourlyAddressCount.startTimeUnix;
+    //
+    //     if (hourlyAddressCountData && hourlyBasicNetStatsData) {
+    //         if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
+    //             let newHourlyNetStats: netStats = {
+    //                 ...hourlyBasicNetStatsData,
+    //                 numberOfAddress: hourlyAddressCount.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
+    //             console.log(`${currentTimeReadable()} | Emit : 'newHourlyNetStats' | To : dataPoolServer`);
+    //             hourlyBasicNetStatsData = null;
+    //             hourlyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    client.on("hourlyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`);
 
-        hourlyBasicNetStatsData = recordOfEthDB;
-        hourlyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+        hourlyBasicNetStatsData = basicNetStats;
+        hourlyBasicNetStatsDate = basicNetStats.startTimeUnix;
 
-        if (hourlyBasicNetStatsData && hourlyAddressCountData) {
-            if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
-                let newHourlyNetStats: netStats = {
-                    ...recordOfEthDB,
-                    numberOfAddress: hourlyAddressCountData.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
-                hourlyBasicNetStatsData = null;
-                hourlyAddressCountData = null;
-            }
+        let newHourlyNetStats: netStats = {
+            ...basicNetStats,
         }
-    });
 
-    //Listener for the minutely address counter.
-    client.on("hourlyAddressCountRecorded", (hourlyAddressCount: numberOfAddress) => {
+        client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
+        hourlyBasicNetStatsData = null;
+        hourlyAddressCountData = null;
 
-        console.log(`${currentTimeReadable()} | Receive : 'hourlyAddressCountRecorded' | From : hourlyAddressCountRecorder`);
-
-        hourlyAddressCountData = hourlyAddressCount;
-        hourlyAddressCountDate = hourlyAddressCount.startTimeUnix;
-
-        if (hourlyAddressCountData && hourlyBasicNetStatsData) {
-            if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
-                let newHourlyNetStats: netStats = {
-                    ...hourlyBasicNetStatsData,
-                    numberOfAddress: hourlyAddressCount.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
-                console.log(`${currentTimeReadable()} | Emit : 'newHourlyNetStats' | To : dataPoolServer`);
-                hourlyBasicNetStatsData = null;
-                hourlyAddressCountData = null;
-            }
-        }
     });
 
     //Listener for a socketClient of the dataPoolServer.
+    // client.on("requestInitialHourlyNetStats", async () => {
+    //     console.log(`${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`);
+    //
+    //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                                   FROM hourlyAddressCount
+    //                                                                   ORDER BY endTimeUnix DESC
+    //                                                                   LIMIT 25`);
+    //
+    //     let hourlyAddressCount: Array<numberOfAddress> = mysqlRes[0];
+    //
+    //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                               FROM hourlyBasicNetStats
+    //                                                               WHERE endTimeUnix <= ${hourlyAddressCount[0].endTimeUnix}
+    //                                                               ORDER BY endTimeUnix DESC
+    //                                                               LIMIT 25`);
+    //
+    //     let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
+    //
+    //     let initialHourlyNetStats: netStatsArray = [];
+    //
+    //     for (let i = 0; i < hourlyAddressCount.length; i++) {
+    //         initialHourlyNetStats.push({
+    //             ...hourlyBasicInitialNetStats[i],
+    //             numberOfAddress: hourlyAddressCount[i].numberOfAddress,
+    //         });
+    //     }
+    //
+    //     initialHourlyNetStats.reverse();
+    //
+    //     socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", initialHourlyNetStats);
+    //     console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
+    // });
+
     client.on("requestInitialHourlyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM hourlyAddressCount
-                                                                      ORDER BY endTimeUnix DESC
-                                                                      LIMIT 25`);
-
-        let hourlyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-
-        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.hourlyBasicNetStats
-                                                                  WHERE endTimeUnix <= ${hourlyAddressCount[0].endTimeUnix}
+                                                                  FROM hourlyBasicNetStats
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 25`);
 
         let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
-        let initialHourlyNetStats: netStatsArray = [];
+        hourlyBasicInitialNetStats.reverse();
 
-        for (let i = 0; i < hourlyAddressCount.length; i++) {
-            initialHourlyNetStats.push({
-                ...hourlyBasicInitialNetStats[i],
-                numberOfAddress: hourlyAddressCount[i].numberOfAddress,
-            });
-        }
-
-        initialHourlyNetStats.reverse();
-
-        socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", initialHourlyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", hourlyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
     });
 
@@ -352,80 +421,112 @@ socketServer.on('connection', (client) => {
     //"dailyAddressCountRecorded" & "dailyBasicNetStatsRecorded" are exclusive events.
     //
 
-    //Listener for the minutely net stats.
-    client.on("dailyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //Listener for the daily net stats.
+    // client.on("dailyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`);
+    //
+    //     dailyBasicNetStatsData = recordOfEthDB;
+    //     dailyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+    //
+    //     if (dailyBasicNetStatsData && dailyAddressCountData) {
+    //         if (dailyBasicNetStatsDate === dailyAddressCountDate) {
+    //             let newDailyNetStats: netStats = {
+    //                 ...recordOfEthDB,
+    //                 numberOfAddress: dailyAddressCountData.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
+    //             dailyBasicNetStatsData = null;
+    //             dailyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    //Listener for the daily address counter.
+    // client.on("dailyAddressCountRecorded", (dailyAddressCount: numberOfAddress) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Receive : 'dailyAddressCountRecorded' | From : dailyAddressCountRecorder`);
+    //
+    //     dailyAddressCountData = dailyAddressCount;
+    //     dailyAddressCountDate = dailyAddressCount.startTimeUnix;
+    //
+    //     if (dailyAddressCountData && dailyBasicNetStatsData) {
+    //         if (dailyBasicNetStatsDate === dailyAddressCountDate) {
+    //             let newDailyNetStats: netStats = {
+    //                 ...dailyBasicNetStatsData,
+    //                 numberOfAddress: dailyAddressCount.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newDailyNetStats', newDailyNetStats);
+    //             console.log(`${currentTimeReadable()} | Emit : 'newDailyNetStats' | To : dataPoolServer`);
+    //             dailyBasicNetStatsData = null;
+    //             dailyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    client.on("dailyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`);
 
-        dailyBasicNetStatsData = recordOfEthDB;
-        dailyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+        dailyBasicNetStatsData = basicNetStats;
+        dailyBasicNetStatsDate = basicNetStats.startTimeUnix;
 
-        if (dailyBasicNetStatsData && dailyAddressCountData) {
-            if (dailyBasicNetStatsDate === dailyAddressCountDate) {
-                let newDailyNetStats: netStats = {
-                    ...recordOfEthDB,
-                    numberOfAddress: dailyAddressCountData.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
-                dailyBasicNetStatsData = null;
-                dailyAddressCountData = null;
-            }
+        let newDailyNetStats: netStats = {
+            ...basicNetStats,
         }
-    });
 
-    //Listener for the minutely address counter.
-    client.on("dailyAddressCountRecorded", (dailyAddressCount: numberOfAddress) => {
+        client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
+        dailyBasicNetStatsData = null;
+        dailyAddressCountData = null;
 
-        console.log(`${currentTimeReadable()} | Receive : 'dailyAddressCountRecorded' | From : dailyAddressCountRecorder`);
-
-        dailyAddressCountData = dailyAddressCount;
-        dailyAddressCountDate = dailyAddressCount.startTimeUnix;
-
-        if (dailyAddressCountData && dailyBasicNetStatsData) {
-            if (dailyBasicNetStatsDate === dailyAddressCountDate) {
-                let newDailyNetStats: netStats = {
-                    ...dailyBasicNetStatsData,
-                    numberOfAddress: dailyAddressCount.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newDailyNetStats', newDailyNetStats);
-                console.log(`${currentTimeReadable()} | Emit : 'newDailyNetStats' | To : dataPoolServer`);
-                dailyBasicNetStatsData = null;
-                dailyAddressCountData = null;
-            }
-        }
     });
 
     //Listener for a socketClient of the dataPoolServer.
+    // client.on("requestInitialDailyNetStats", async () => {
+    //     console.log(`${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`);
+    //
+    //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                                   FROM dailyAddressCount
+    //                                                                   ORDER BY endTimeUnix DESC
+    //                                                                   LIMIT 8`);
+    //
+    //     let dailyAddressCount: Array<numberOfAddress> = mysqlRes[0];
+    //
+    //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                               FROM ethereum.dailyBasicNetStats
+    //                                                               WHERE endTimeUnix <= ${dailyAddressCount[0].endTimeUnix}
+    //                                                               ORDER BY endTimeUnix DESC
+    //                                                               LIMIT 8`);
+    //
+    //     let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
+    //
+    //     let initialDailyNetStats: netStatsArray = [];
+    //
+    //     for (let i = 0; i < dailyAddressCount.length; i++) {
+    //         initialDailyNetStats.push({
+    //             ...dailyBasicInitialNetStats[i],
+    //             numberOfAddress: dailyAddressCount[i].numberOfAddress,
+    //         });
+    //     }
+    //
+    //     initialDailyNetStats.reverse();
+    //
+    //     socketServer.to(dataPoolServerId).emit("initialDailyNetStats", initialDailyNetStats);
+    //     console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
+    // });
+
     client.on("requestInitialDailyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM dailyAddressCount
-                                                                      ORDER BY endTimeUnix DESC
-                                                                      LIMIT 8`);
-
-        let dailyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-
-        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM ethereum.dailyBasicNetStats
-                                                                  WHERE endTimeUnix <= ${dailyAddressCount[0].endTimeUnix}
-                                                                  ORDER BY endTimeUnix DESC
                                                                   LIMIT 8`);
 
         let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
-        let initialDailyNetStats: netStatsArray = [];
+        dailyBasicInitialNetStats.reverse();
 
-        for (let i = 0; i < dailyAddressCount.length; i++) {
-            initialDailyNetStats.push({
-                ...dailyBasicInitialNetStats[i],
-                numberOfAddress: dailyAddressCount[i].numberOfAddress,
-            });
-        }
-
-        initialDailyNetStats.reverse();
-
-        socketServer.to(dataPoolServerId).emit("initialDailyNetStats", initialDailyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialDailyNetStats", dailyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
     });
 
@@ -434,80 +535,112 @@ socketServer.on('connection', (client) => {
     //"weeklyAddressCountRecorded" & "weeklyBasicNetStatsRecorded" are exclusive events.
     //
 
-    //Listener for the minutely net stats.
-    client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //Listener for the weekly net stats.
+    // client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
+    //
+    //     weeklyBasicNetStatsData = recordOfEthDB;
+    //     weeklyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+    //
+    //     if (weeklyBasicNetStatsData && weeklyAddressCountData) {
+    //         if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
+    //             let newDailyNetStats: netStats = {
+    //                 ...recordOfEthDB,
+    //                 numberOfAddress: weeklyAddressCountData.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
+    //             weeklyBasicNetStatsData = null;
+    //             weeklyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    //Listener for the weekly address counter.
+    // client.on("weeklyAddressCountRecorded", (weeklyAddressCount: numberOfAddress) => {
+    //
+    //     console.log(`${currentTimeReadable()} | Receive : 'weeklyAddressCountRecorded' | From : weeklyAddressCountRecorder`);
+    //
+    //     weeklyAddressCountData = weeklyAddressCount;
+    //     weeklyAddressCountDate = weeklyAddressCount.startTimeUnix;
+    //
+    //     if (weeklyAddressCountData && weeklyBasicNetStatsData) {
+    //         if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
+    //             let newWeeklyNetStats: netStats = {
+    //                 ...weeklyBasicNetStatsData,
+    //                 numberOfAddress: weeklyAddressCount.numberOfAddress,
+    //             }
+    //             client.to(dataPoolServerId).emit('newWeeklyNetStats', newWeeklyNetStats);
+    //             console.log(`${currentTimeReadable()} | Emit : 'newWeeklyNetStats' | To : dataPoolServer`);
+    //             weeklyBasicNetStatsData = null;
+    //             weeklyAddressCountData = null;
+    //         }
+    //     }
+    // });
+
+    client.on("weeklyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
 
-        weeklyBasicNetStatsData = recordOfEthDB;
-        weeklyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
+        weeklyBasicNetStatsData = basicNetStats;
+        weeklyBasicNetStatsDate = basicNetStats.startTimeUnix;
 
-        if (weeklyBasicNetStatsData && weeklyAddressCountData) {
-            if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
-                let newDailyNetStats: netStats = {
-                    ...recordOfEthDB,
-                    numberOfAddress: weeklyAddressCountData.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
-                weeklyBasicNetStatsData = null;
-                weeklyAddressCountData = null;
-            }
+        let newDailyNetStats: netStats = {
+            ...basicNetStats,
         }
-    });
 
-    //Listener for the minutely address counter.
-    client.on("weeklyAddressCountRecorded", (weeklyAddressCount: numberOfAddress) => {
-
-        console.log(`${currentTimeReadable()} | Receive : 'weeklyAddressCountRecorded' | From : weeklyAddressCountRecorder`);
-
-        weeklyAddressCountData = weeklyAddressCount;
-        weeklyAddressCountDate = weeklyAddressCount.startTimeUnix;
-
-        if (weeklyAddressCountData && weeklyBasicNetStatsData) {
-            if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
-                let newWeeklyNetStats: netStats = {
-                    ...weeklyBasicNetStatsData,
-                    numberOfAddress: weeklyAddressCount.numberOfAddress,
-                }
-                client.to(dataPoolServerId).emit('newWeeklyNetStats', newWeeklyNetStats);
-                console.log(`${currentTimeReadable()} | Emit : 'newWeeklyNetStats' | To : dataPoolServer`);
-                weeklyBasicNetStatsData = null;
-                weeklyAddressCountData = null;
-            }
-        }
+        client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
+        weeklyBasicNetStatsData = null;
+        weeklyAddressCountData = null;
     });
 
     //Listener for a socketClient of the dataPoolServer.
+    // client.on("requestInitialWeeklyNetStats", async () => {
+    //     console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
+    //
+    //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                                   FROM weeklyAddressCount
+    //                                                                   ORDER BY endTimeUnix DESC
+    //                                                                   LIMIT 25`);
+    //
+    //     let weeklyAddressCount: Array<numberOfAddress> = mysqlRes[0];
+    //
+    //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+    //                                                               FROM ethereum.weeklyBasicNetStats
+    //                                                               WHERE endTimeUnix <= ${weeklyAddressCount[0].endTimeUnix}
+    //                                                               ORDER BY endTimeUnix DESC
+    //                                                               LIMIT 25`);
+    //
+    //     let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
+    //
+    //     let initialWeeklyNetStats: netStatsArray = [];
+    //
+    //     for (let i = 0; i < weeklyAddressCount.length; i++) {
+    //         initialWeeklyNetStats.push({
+    //             ...weeklyBasicInitialNetStats[i],
+    //             numberOfAddress: weeklyAddressCount[i].numberOfAddress,
+    //         });
+    //     }
+    //
+    //     initialWeeklyNetStats.reverse();
+    //
+    //     socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
+    //     console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
+    // });
+
     client.on("requestInitialWeeklyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM weeklyAddressCount
-                                                                      ORDER BY endTimeUnix DESC
-                                                                      LIMIT 25`);
-
-        let weeklyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-
-        mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM ethereum.weeklyBasicNetStats
-                                                                  WHERE endTimeUnix <= ${weeklyAddressCount[0].endTimeUnix}
                                                                   ORDER BY endTimeUnix DESC
                                                                   LIMIT 25`);
 
         let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
-        let initialWeeklyNetStats: netStatsArray = [];
+        weeklyBasicInitialNetStats.reverse();
 
-        for (let i = 0; i < weeklyAddressCount.length; i++) {
-            initialWeeklyNetStats.push({
-                ...weeklyBasicInitialNetStats[i],
-                numberOfAddress: weeklyAddressCount[i].numberOfAddress,
-            });
-        }
-
-        initialWeeklyNetStats.reverse();
-
-        socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
+        socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", weeklyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
     });
 
