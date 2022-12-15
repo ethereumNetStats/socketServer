@@ -151,8 +151,7 @@ socketServer.on('connection', (client) => {
     //Listener for the block data recorder.
     client.on("newBlockDataRecorded", async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
 
-        console.log(`${currentTimeReadable()} | Receive : 'newBlockDataRecorded'`);
-        console.log(blockNumberWithTimestamp);
+        console.log(`${currentTimeReadable()} | Receive : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber && blockNumberWithTimestamp.blockNumber} | Timestamp : ${blockNumberWithTimestamp.timestamp && unixTimeReadable(blockNumberWithTimestamp.timestamp)}`);
 
         socketServer.to(minutelyBasicNetStatsMakerId).emit("newBlockDataRecorded", blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
@@ -165,7 +164,7 @@ socketServer.on('connection', (client) => {
 
         let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                         FROM blockData
-                                                                        WHERE number = ${blockNumberWithTimestamp.blockNumber}`);
+                                                                        WHERE timestamp = ${blockNumberWithTimestamp.timestamp}`);
 
         let newBlockData: blockData = mysqlRes[0];
 
