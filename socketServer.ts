@@ -788,8 +788,8 @@ socketServer.on('connection', (client) => {
 
         mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM blockData
-                                                                  WHERE number >= ${lastBlockNumber}
-                                                                    AND number < ${topBlockNumber}
+                                                                  WHERE number > ${lastBlockNumber}
+                                                                    AND number <= ${topBlockNumber}
                                                                   ORDER BY number DESC`);
 
         let responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber = {
