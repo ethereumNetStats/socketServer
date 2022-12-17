@@ -288,9 +288,9 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.minutelyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 61`);
+                                                                      FROM ethereum.minutelyBasicNetStats
+                                                                      ORDER BY endTimeUnix DESC
+                                                                      LIMIT 61`);
 
         let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
@@ -403,9 +403,9 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM hourlyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 25`);
+                                                                      FROM hourlyBasicNetStats
+                                                                      ORDER BY endTimeUnix DESC
+                                                                      LIMIT 25`);
 
         let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
@@ -518,8 +518,9 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.dailyBasicNetStats
-                                                                  LIMIT 8`);
+                                                                      FROM ethereum.dailyBasicNetStats
+                                                                      ORDER BY endTimeUnix DESC
+                                                                      LIMIT 8`);
 
         let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
@@ -631,9 +632,9 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
 
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.weeklyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 25`);
+                                                                      FROM ethereum.weeklyBasicNetStats
+                                                                      ORDER BY endTimeUnix DESC
+                                                                      LIMIT 25`);
 
         let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
