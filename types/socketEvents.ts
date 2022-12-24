@@ -1,3 +1,4 @@
+// 型定義のインポート
 import type {
     netStatsArray,
     blockNumberWithTimestamp,
@@ -11,8 +12,9 @@ import type {
     responseBlockList, requestBlockList, requestBlockListPageByBlockNumber, responseBlockListPageByBlockNumber
 } from "./types";
 
+// データレコーダー及びデータプールサーバーとのsocket.ioイベントのイベント名と引数の型を登録
 type ClientToServerEvents = {
-    //Events with backend socket clients.
+    // 各データレコーダーから発行されるイベントの登録
     newBlockDataRecorded: (blockNumberWithTimestamp: blockNumberWithTimestamp) => void,
     addressChecked: (blockNumber: number) => void,
 
@@ -28,7 +30,7 @@ type ClientToServerEvents = {
     weeklyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void,
     weeklyAddressCountRecorded: (weeklyAddressCount: numberOfAddress) => void,
 
-    //Events with the dataPoolServer socket client.
+    // データプールサーバーから発行されるイベントの登録
     requestInitialMinutelyNetStats: () => void,
     requestInitialHourlyNetStats: () => void,
     requestInitialDailyNetStats: () => void,
@@ -41,12 +43,13 @@ type ClientToServerEvents = {
     requestBlockListPageByBlockNumber: (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) => void,
 }
 
+// socketServerから各データレコーダー及びデータプールサーバーに発行するイベントの登録
 type ServerToClientEvents = {
-    //Events with backend socket clients.
+    // 各データレコーダーに発行するイベントの登録
     newBlockDataRecorded: (blockNumberWithTimestamp: blockNumberWithTimestamp) => void,
     addressChecked: (blockNumber: number) => void,
 
-    //Events with the dataPoolServer socket client.
+    // データプールサーバーに発行するイベントの登録
     initialMinutelyNetStats: (minutelyNetStatsArray: netStatsArray) => void,
     newMinutelyNetStats: (minutelyNetStats: netStats) => void,
 

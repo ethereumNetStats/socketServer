@@ -1,38 +1,38 @@
-//Import environment variables.
+// 環境変数のインポート
 import "dotenv/config";
 
-//Import packages.
+// パッケージのインポート
 import {Server} from "socket.io";
 
-//Import self-made packages.
-import {currentTimeReadable, unixTimeReadable} from "@pierogi.dev/readable_time";
-import {getMysqlConnection, RowDataPacket} from "@pierogi.dev/get_mysql_connection";
+// 自作パッケージのインポート
+import {currentTimeReadable, unixTimeReadable} from "@ethereum_net_stats/readable_time";
+import {getMysqlConnection, RowDataPacket} from "@ethereum_net_stats/get_mysql_connection";
 
-//Import socket event definitions.
+// ソケットイベント定義のインポート
 import type {ClientToServerEvents, ServerToClientEvents} from "./types/socketEvents";
 
-//Import types.
+// 型定義のインポート
 import type {
     blockNumberWithTimestamp,
-    numberOfAddress,
-    netStats,
+    // numberOfAddress,
+    // netStats,
     basicNetStats,
     blockDataArray,
     blockData,
     responseBlockDetail,
     responseBlockList,
     requestBlockListPageByBlockNumber,
-    responseBlockListPageByBlockNumber,
+    responseBlockListPageByBlockNumber, requestBlockDetail, requestBlockList,
 } from "./types/types";
 
-import type {Pool} from "@pierogi.dev/get_mysql_connection";
+import type {Pool} from "@ethereum_net_stats/get_mysql_connection";
 
 const mysqlConnection: Pool = await getMysqlConnection(false);
 
-//Launch a socket-io server.
+// socket.io-serverの起動
 const socketServer: Server<ClientToServerEvents, ServerToClientEvents> = new Server(6000);
 
-//Define socket-io client id variable.
+// socket.io-clientのID格納用変数の初期化
 let minutelyBasicNetStatsMakerId: string = '';
 let hourlyBasicNetStatsMakerId: string = '';
 let dailyBasicNetStatsMakerId: string = '';
@@ -47,7 +47,7 @@ let blockDataRecorderId: string = '';
 let newAddressRecorderId: string = '';
 let dataPoolServerId: string = '';
 
-//Define socket-io client name.
+// socket.io-clientの名前定義
 const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsRecorder';
 const hourlyBasicNetStatsMakerName: string = 'hourlyBasicNetStatsRecorder';
 const dailyBasicNetStatsMakerName: string = 'dailyBasicNetStatsRecorder';
@@ -62,34 +62,35 @@ const blockDataRecorderName: string = 'blockDataRecorder';
 const newAddressRecorderName: string = 'newAddressRecorder';
 const dataPoolServerName: string = "dataPoolServer";
 
-//Define variables for the minutely data handler.
-let minutelyBasicNetStatsDate: number | null;
-let minutelyBasicNetStatsData: basicNetStats | null;
+// １分ごとの集計データの格納用変数の定義.
+// let minutelyBasicNetStatsDate: number | null;
+// let minutelyBasicNetStatsData: basicNetStats | null;
 // let minutelyAddressCountDate: number | null;
-let minutelyAddressCountData: numberOfAddress | null;
+// let minutelyAddressCountData: numberOfAddress | null;
 
-//Define variables for the hourly data handler.
-let hourlyBasicNetStatsDate: number | null;
-let hourlyBasicNetStatsData: basicNetStats | null;
+// １時間ごとの集計データの格納用変数の定義
+// let hourlyBasicNetStatsDate: number | null;
+// let hourlyBasicNetStatsData: basicNetStats | null;
 // let hourlyAddressCountDate: number | null;
-let hourlyAddressCountData: numberOfAddress | null;
+// let hourlyAddressCountData: numberOfAddress | null;
 
-//Define variables for the daily data handler.
-let dailyBasicNetStatsDate: number | null;
-let dailyBasicNetStatsData: basicNetStats | null;
+// １日ごとの集計データの格納用変数の定義
+// let dailyBasicNetStatsDate: number | null;
+// let dailyBasicNetStatsData: basicNetStats | null;
 // let dailyAddressCountDate: number | null;
-let dailyAddressCountData: numberOfAddress | null;
+// let dailyAddressCountData: numberOfAddress | null;
 
-//Define variables for the weekly data handler.
-let weeklyBasicNetStatsDate: number | null;
-let weeklyBasicNetStatsData: basicNetStats | null;
+// １週間ごとの集計データの格納用変数の定義
+// let weeklyBasicNetStatsDate: number | null;
+// let weeklyBasicNetStatsData: basicNetStats | null;
 // let weeklyAddressCountDate: number | null;
-let weeklyAddressCountData: numberOfAddress | null;
+// let weeklyAddressCountData: numberOfAddress | null;
 
+// ソケットサーバーのイベント登録
 socketServer.on('connection', (client) => {
     console.log(`${currentTimeReadable()} | Connect with a socket client. ID : ${client.id}`);
 
-    //Store client socket id.
+    // クライアントから接続されたときにソケットIDを記録
     switch (client.handshake.query.name) {
 
         case minutelyBasicNetStatsMakerName:
@@ -148,11 +149,12 @@ socketServer.on('connection', (client) => {
             break;
     }
 
-    //Listener for the block data recorder.
+    // blockDataRecorderによって発行される"newBlockDataRecorded"イベントを受信した時の処理
     client.on("newBlockDataRecorded", async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
 
         console.log(`${currentTimeReadable()} | Receive : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber && blockNumberWithTimestamp.blockNumber} | Timestamp : ${blockNumberWithTimestamp.timestamp && unixTimeReadable(blockNumberWithTimestamp.timestamp)}`);
 
+        // "newBlockDataRecorded"イベントで受信したデータを各データレコーダーへ転送
         socketServer.to(minutelyBasicNetStatsMakerId).emit("newBlockDataRecorded", blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
         socketServer.to(hourlyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
@@ -162,17 +164,19 @@ socketServer.on('connection', (client) => {
         socketServer.to(weeklyBasicNetStatsMakerId).emit('newBlockDataRecorded', blockNumberWithTimestamp);
         console.log(`${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${blockNumberWithTimestamp.blockNumber} | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`);
 
+        // blockDataRecorderから通知されたブロックナンバーのブロックデータ（最新のブロックデータ）をデータベースから取得
         let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                         FROM blockData
                                                                         WHERE timestamp = ${blockNumberWithTimestamp.timestamp}`);
 
         let newBlockData: blockData = mysqlRes[0];
 
+        // 最新のブロックデータをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit('newBlockData', newBlockData);
         console.log(`${currentTimeReadable()} | Emit : 'newBlockData' | To : dataPoolServer`);
     });
 
-    //Listener for the new address recorder.
+    // addressRecorderがアドレスのチェックを完了した通知を各addressRecorderに転送
     client.on("addressChecked", (blockNumber: number) => {
         socketServer.to(minutelyAddressCounterId).emit("addressChecked", blockNumber);
         console.log(`${currentTimeReadable()} | Proxy : newAddressRecorder -> minutelyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`);
@@ -233,21 +237,13 @@ socketServer.on('connection', (client) => {
     //     }
     // });
 
-    //Listener for the minutely net stats.
+    // １分間のデータ集計が完了した時のイベント"minutelyBasicNetStatsRecorded"を受信した時の処理の登録
     client.on("minutelyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
         console.log(`${currentTimeReadable()} | Receive :'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
 
-        minutelyBasicNetStatsData = basicNetStats;
-        minutelyBasicNetStatsDate = basicNetStats.startTimeUnix;
-
-        let newMinutelyNetStats: netStats = {
-            ...basicNetStats,
-        }
-
-        client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
-        console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
-        minutelyBasicNetStatsData = null;
-        minutelyAddressCountData = null;
+        // dataPoolServerに受信したデータを転送
+        client.to(dataPoolServerId).emit('newMinutelyNetStats', basicNetStats);
+        console.log(`${currentTimeReadable()} | Emit : newMinutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
     });
 
     //Listener for a socketClient of the dataPoolServer.
@@ -284,18 +280,23 @@ socketServer.on('connection', (client) => {
     //     console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
     // });
 
+    // dataPoolServerが起動したときに発行する"requestInitialMinutelyNetStats"イベントを受信した時の処理の登録
     client.on("requestInitialMinutelyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`);
 
+        // dataPoolServerへ送信する１分ごとの集計データの初期データとして最新１時間分のデータをデータベースから取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM ethereum.minutelyBasicNetStats
                                                                       ORDER BY endTimeUnix DESC
                                                                       LIMIT 61`);
 
+        // データベースの応答データから必要なデータを抽出
         let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
+        // データが時系列順に並ぶように並び替え
         minutelyBasicInitialNetStats.reverse();
 
+        // １分ごとの集計データの初期データをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", minutelyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
     });
@@ -348,21 +349,13 @@ socketServer.on('connection', (client) => {
     //     }
     // });
 
+    // １時間のデータ集計が完了した時のイベント"hourlyBasicNetStatsRecorded"を受信した時の処理の登録
     client.on("hourlyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
-
         console.log(`${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`);
 
-        hourlyBasicNetStatsData = basicNetStats;
-        hourlyBasicNetStatsDate = basicNetStats.startTimeUnix;
-
-        let newHourlyNetStats: netStats = {
-            ...basicNetStats,
-        }
-
-        client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
-        hourlyBasicNetStatsData = null;
-        hourlyAddressCountData = null;
-
+        // dataPoolServerに受信したデータを転送
+        client.to(dataPoolServerId).emit('newHourlyNetStats', basicNetStats);
+        console.log(`${currentTimeReadable()} | Emit : newHourlyNetStats | To : dataPoolServer | Trigger event : 'hourlyBasicNetStatsRecorded'`);
     });
 
     //Listener for a socketClient of the dataPoolServer.
@@ -399,18 +392,23 @@ socketServer.on('connection', (client) => {
     //     console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
     // });
 
+    // dataPoolServerが起動したときに発行する"requestInitialHourlyNetStats"イベントを受信した時の処理の登録
     client.on("requestInitialHourlyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`);
 
+        // dataPoolServerへ送信する１時間ごとの集計データの初期データとして最新１日分のデータをデータベースから取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM hourlyBasicNetStats
                                                                       ORDER BY endTimeUnix DESC
                                                                       LIMIT 25`);
 
+        // データベースの応答データから必要なデータを抽出
         let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
+        // データが時系列順に並ぶように並び替え
         hourlyBasicInitialNetStats.reverse();
 
+        // １時間ごとの集計データの初期データをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", hourlyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
     });
@@ -463,21 +461,13 @@ socketServer.on('connection', (client) => {
     //     }
     // });
 
+    // １日のデータ集計が完了した時のイベント"dailyBasicNetStatsRecorded"を受信した時の処理の登録
     client.on("dailyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
-
         console.log(`${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`);
 
-        dailyBasicNetStatsData = basicNetStats;
-        dailyBasicNetStatsDate = basicNetStats.startTimeUnix;
-
-        let newDailyNetStats: netStats = {
-            ...basicNetStats,
-        }
-
-        client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
-        dailyBasicNetStatsData = null;
-        dailyAddressCountData = null;
-
+        // dataPoolServerに受信したデータを転送
+        client.to(dataPoolServerId).emit('newDailyNetStats', basicNetStats);
+        console.log(`${currentTimeReadable()} | Emit : newDailyNetStats | To : dataPoolServer | Trigger event : 'dailyBasicNetStatsRecorded'`);
     });
 
     //Listener for a socketClient of the dataPoolServer.
@@ -514,18 +504,23 @@ socketServer.on('connection', (client) => {
     //     console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
     // });
 
+    // dataPoolServerが起動したときに発行する"requestInitialDailyNetStats"イベントを受信した時の処理の登録
     client.on("requestInitialDailyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`);
 
+        // dataPoolServerへ送信する１日ごとの集計データの初期データとして最新１週間分のデータをデータベースから取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM ethereum.dailyBasicNetStats
                                                                       ORDER BY endTimeUnix DESC
                                                                       LIMIT 8`);
 
+        // データベースの応答データから必要なデータを抽出
         let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
+        // データが時系列順に並ぶように並び替え
         dailyBasicInitialNetStats.reverse();
 
+        // １日ごとの集計データの初期データをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit("initialDailyNetStats", dailyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
     });
@@ -578,20 +573,14 @@ socketServer.on('connection', (client) => {
     //     }
     // });
 
+    // １週間のデータ集計が完了した時のイベント"weeklyBasicNetStatsRecorded"を受信した時の処理の登録
     client.on("weeklyBasicNetStatsRecorded", (basicNetStats: basicNetStats) => {
 
         console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
 
-        weeklyBasicNetStatsData = basicNetStats;
-        weeklyBasicNetStatsDate = basicNetStats.startTimeUnix;
-
-        let newDailyNetStats: netStats = {
-            ...basicNetStats,
-        }
-
-        client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
-        weeklyBasicNetStatsData = null;
-        weeklyAddressCountData = null;
+        // dataPoolServerに受信したデータを転送
+        client.to(dataPoolServerId).emit('newWeeklyNetStats', basicNetStats);
+        console.log(`${currentTimeReadable()} | Emit : newWeeklyNetStats | To : dataPoolServer | Trigger event : 'weeklyBasicNetStatsRecorded'`);
     });
 
     //Listener for a socketClient of the dataPoolServer.
@@ -628,91 +617,127 @@ socketServer.on('connection', (client) => {
     //     console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
     // });
 
+    // dataPoolServerが起動したときに発行する"requestInitialWeeklyNetStats"イベントを受信した時の処理の登録
     client.on("requestInitialWeeklyNetStats", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
 
+        // dataPoolServerへ送信する１週間ごとの集計データの初期データとして最新２５週間分のデータをデータベースから取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM ethereum.weeklyBasicNetStats
                                                                       ORDER BY endTimeUnix DESC
                                                                       LIMIT 25`);
 
+        // データベースの応答データから必要なデータを抽出
         let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
 
+        // データが時系列順に並ぶように並び替え
         weeklyBasicInitialNetStats.reverse();
 
+        // １週間ごとの集計データの初期データをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", weeklyBasicInitialNetStats);
         console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
     });
 
-    //Listener for the socket client of the dataPoolServer regarding blockData.
+    // dataPoolServerが起動したときに発行する"requestInitialBlockData"を受信した時の処理の登録
+    // この処理によってトップページの"Latest blocks"セクションの初期表示データがバックエンドから送信されます。
     client.on("requestInitialBlockData", async () => {
         console.log(`${currentTimeReadable()} | Receive : 'requestInitialBlockData' | From : dataPoolServer`);
 
+        // "blockData"テーブルから最新１０ブロック分のデータを取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 10`);
 
+        // MySQLの応答データから必要なデータを抽出
         let initialBlockData: blockDataArray = mysqlRes[0];
 
+        // 抽出したデータをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit("initialBlockData", initialBlockData);
         console.log(`${currentTimeReadable()} | Emit : 'initialBlockData' | To : dataPoolServer`);
     });
 
-    //Listener for the requestBlockDetail event.
-    client.on("requestBlockDetail", async (requestBlockDetail) => {
+    // dataPoolServerから"requestBlockDetail"イベントを受信した時の処理の登録
+    // この処理によってユーザーが"Latest Blocks"セクションのブロックナンバーをクリックした時、または"Block list"ページのブロックナンバーをクリックした時
+    // に表示する"Block detail"ページの情報が送信されます。
+    client.on("requestBlockDetail", async (requestBlockDetail: requestBlockDetail) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestBlockDetail' | From : dataPoolServer | FrontendId : ${requestBlockDetail.frontendId}`);
 
+        // ユーザーが詳細を要求したブロックナンバーを受信データから抽出して、当該ブロックナンバーのブロックデータをデータベースから取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                       FROM blockData
                                                                       WHERE number = ${requestBlockDetail.number}`);
 
         if (mysqlRes[0].length) {
 
+            // データベースからの応答が空でない場合に応答データから必要なデータを抽出
             let responseBlockDetail: responseBlockDetail = mysqlRes[0][0];
+
+            // ユーザーのsocket.io-clientのIDを応答データに追加
             responseBlockDetail.frontendId = requestBlockDetail.frontendId;
+
+            // データが空でないことを示すフラグを応答データに追加
             responseBlockDetail.noRecord = false;
 
+            // 応答データをdataPoolServerに送信
             socketServer.to(dataPoolServerId).emit('responseBlockDetail', (responseBlockDetail));
             console.log(`${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${responseBlockDetail.noRecord}`);
 
         } else {
 
+            // データベースからの応答が空の場合に空のデータを代入
             let responseBlockDetail: responseBlockDetail = mysqlRes[0][0];
+
+            // ユーザーのsocket.io-clientのIDを応答データに追加
             responseBlockDetail.frontendId = requestBlockDetail.frontendId;
+
+            // データが空であることを示すフラグを応答データに追加
             responseBlockDetail.noRecord = true;
 
+            // 応答データをdataPoolServerに送信
             socketServer.to(dataPoolServerId).emit('responseBlockDetail', (responseBlockDetail));
             console.log(`${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${responseBlockDetail.noRecord}`);
         }
 
     });
 
-    //Listener for the requestBlockList event.
-    client.on('requestBlockList', async (requestBlockList) => {
+    // dataPoolServerから"requestBlockList"イベントを受信した時の処理の登録
+    // これによりユーザーが"View all blocks"をクリックした時の"Block list"ページの初期表示データが送信されます。
+    // "Block list"ページの初期表示ではrequestBlockList.pageOffset=0を受け取ります。
+    // また、ユーザーがページ番号をクリックした時の表示データもこの処理によって送信されます。
+    // ユーザーがページ番号をクリックしたときはrequestBlockList.pageOffsetにクリックしたページ番号が設定されています。
+    client.on('requestBlockList', async (requestBlockList: requestBlockList) => {
         console.log(`${currentTimeReadable()} | Receive : 'requestBlockList' | From : dataPoolServer`);
 
+        // １ページ当たりの表示データ数の定義
         const itemsPerPage: number = 25;
 
+        // 最初にデータベースにおける最新のブロックナンバーを取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
                                                                       FROM blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 1`);
 
+        // データベースの応答データから最新のブロックナンバーを抽出
         let latestBlockNumber: number = mysqlRes[0][0].number;
 
+        // 最新のブロックナンバーと１ページ当たりの表示データ数からトータルページ数を計算
         let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage);
 
+        // 要求されたページの最初のブロックナンバーを計算
         let topBlockNumber: number = latestBlockNumber - (itemsPerPage * requestBlockList.pageOffset);
 
+        // 要求されたページの最後のブロックナンバーを計算
         let lastBlockNumber: number = topBlockNumber - itemsPerPage;
 
+        // 要求されたページの全てのブロックデータをデータベースから取得
         mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM blockData
                                                                   WHERE number >= ${lastBlockNumber}
                                                                     AND number < ${topBlockNumber}
                                                                   ORDER BY number DESC`);
 
+        // 応答データを格納する変数の初期化
         let responseBlockList: responseBlockList = {
             itemsPerPage: 0,
             lastBlockNumber: 0,
@@ -725,6 +750,7 @@ socketServer.on('connection', (client) => {
             frontendId: ''
         };
 
+        // 応答データに実データを代入
         responseBlockList.list = mysqlRes[0];
         responseBlockList.latestBlockNumber = latestBlockNumber;
         responseBlockList.totalPage = totalPage;
@@ -735,63 +761,61 @@ socketServer.on('connection', (client) => {
         responseBlockList.pageOffset = requestBlockList.pageOffset;
         responseBlockList.frontendId = requestBlockList.frontendId;
 
+        // 応答データを送信
         socketServer.to(dataPoolServerId).emit('responseBlockList', responseBlockList);
         console.log(`${currentTimeReadable()} | Emit : 'responseBlockList' | To : dataPoolServer`);
 
     });
 
-    //Listener for the requestBlockListPageByBlockNumber event.
+    // dataPoolServerから"requestBlockListPageByNumber"イベントを受信した時の処理の登録
+    // これにより"Block list"ページでユーザーが入力したブロックナンバーのブロック情報を含むページのデータが送信されます。
     client.on('requestBlockListPageByBlockNumber', async (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) => {
 
         console.log(`${currentTimeReadable()} | Input block number : ${requestBlockListPageByBlockNumber.blockNumber}`);
 
+        // １ページ当たりの表示データ数の定義
         const itemsPerPage: number = 25;
 
+        // 最初にデータベースにおける最新のブロックナンバーを取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
                                                                       FROM blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 1`);
 
+        // データベースの応答データから最新のブロックナンバーを抽出
         let latestBlockNumber: number = mysqlRes[0][0].number;
 
         console.log(`${currentTimeReadable()} | latestBlockNumber : ${latestBlockNumber}`);
 
+        // 最新のブロックナンバーと１ページ当たりの表示データ数からトータルページ数を計算
         let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage);
 
         console.log(`${currentTimeReadable()} | totalPage : ${totalPage}`);
 
-        let currentPage: number = totalPage - (Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage));
+        // ユーザーが入力したブロック番号を含むページを特定するための変数の定義
+        let pageNumber: number = 1;
+        let topBlockNumber: number = latestBlockNumber;
+        let bottomBlockNumber: number = topBlockNumber - itemsPerPage;
 
-        // for (let i = 0; i < totalPage; i++) {
-        //     console.log(`${currentTimeReadable()} | i : ${i}`);
-        //     console.log(`${currentTimeReadable()} | requestBlockListPageByBlockNumber.blockNumber : ${requestBlockListPageByBlockNumber.blockNumber}`);
-        //     console.log(`${currentTimeReadable()} | latestBlockNumber - (itemsPerPage * i) | ${latestBlockNumber - (itemsPerPage * i)}`);
-        //     if (latestBlockNumber - (itemsPerPage * i) < requestBlockListPageByBlockNumber.blockNumber) {
-        //         console.log(`${currentTimeReadable()} | currentPage : ${currentPage}`);
-        //         currentPage = i - 1;
-        //         break;
-        //     }
-        // }
-        //
-        // console.log(`${currentTimeReadable()} | blockNumber / itemsPerPage : ${Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage)}`);
-        // console.log(`${currentTimeReadable()} | new currentPage : ${totalPage - (Math.ceil(requestBlockListPageByBlockNumber.blockNumber / itemsPerPage))}`);
+        // ユーザーが入力したブロック番号を含むページと、当該ページの最初及び最後のブロックナンバーを特定
+        while (!(requestBlockListPageByBlockNumber.blockNumber <= topBlockNumber && requestBlockListPageByBlockNumber.blockNumber > bottomBlockNumber)) {
+            topBlockNumber -= itemsPerPage;
+            bottomBlockNumber -= itemsPerPage;
+            ++pageNumber;
+        }
 
-        console.log(`${currentTimeReadable()} | currentPage : ${currentPage}`);
+        console.log(`${currentTimeReadable()} | pageNumber : ${pageNumber}`);
+        console.log(`${currentTimeReadable()} | topBlockNumberTest : ${topBlockNumber}`);
+        console.log(`${currentTimeReadable()} | bottomBlockNumberTest : ${bottomBlockNumber}`);
 
-        let topBlockNumber: number = (totalPage - currentPage) * itemsPerPage;
-
-        console.log(`${currentTimeReadable()} | topBlockNumber : ${topBlockNumber}`);
-
-        let lastBlockNumber: number = topBlockNumber - itemsPerPage;
-
-        console.log(`${currentTimeReadable()} | lastBlockNumber : ${lastBlockNumber}`);
-
+        // 特定したページに含まれるブロックデータをデータベースから取得
         mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
                                                                   FROM blockData
-                                                                  WHERE number > ${lastBlockNumber}
+                                                                  WHERE number > ${bottomBlockNumber}
                                                                     AND number <= ${topBlockNumber}
                                                                   ORDER BY number DESC`);
 
+        // 応答データを格納する変数の初期化
         let responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber = {
             itemsPerPage: 0,
             lastBlockNumber: 0,
@@ -804,16 +828,18 @@ socketServer.on('connection', (client) => {
             frontendId: ''
         };
 
+        // 応答データに実データを代入
         responseBlockListPageByBlockNumber.list = mysqlRes[0];
         responseBlockListPageByBlockNumber.latestBlockNumber = latestBlockNumber;
         responseBlockListPageByBlockNumber.totalPage = totalPage;
-        responseBlockListPageByBlockNumber.currentPage = currentPage;
+        responseBlockListPageByBlockNumber.currentPage = pageNumber;
         responseBlockListPageByBlockNumber.topBlockNumber = topBlockNumber;
-        responseBlockListPageByBlockNumber.lastBlockNumber = lastBlockNumber;
+        responseBlockListPageByBlockNumber.lastBlockNumber = bottomBlockNumber;
         responseBlockListPageByBlockNumber.itemsPerPage = itemsPerPage;
-        responseBlockListPageByBlockNumber.pageOffset = currentPage;
+        responseBlockListPageByBlockNumber.pageOffset = pageNumber;
         responseBlockListPageByBlockNumber.frontendId = requestBlockListPageByBlockNumber.frontendId;
 
+        // 応答データをdataPoolServerに送信
         socketServer.to(dataPoolServerId).emit('responseBlockList', responseBlockListPageByBlockNumber);
         console.log(`${currentTimeReadable()} | Emit : 'responseBlockListPageByBlockNumber' | To : dataPoolServer`);
     });

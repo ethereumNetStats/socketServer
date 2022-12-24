@@ -1,8 +1,10 @@
+// blockDataRecorderから受け取るデータ型の定義
 type blockNumberWithTimestamp = {
     blockNumber: number | undefined,
     timestamp: number | undefined,
 }
 
+// MySQLの"blockData"テーブルの型定義
 type basicNetStats = {
     startTimeReadable: string,
     endTimeReadable: string,
@@ -38,6 +40,7 @@ type basicNetStats = {
     noRecordFlag: boolean,
 };
 
+// addressCounterから受け取るデータの型定義
 type numberOfAddress = {
     startTimeReadable: string,
     endTimeReadable: string,
@@ -47,6 +50,7 @@ type numberOfAddress = {
     noRecordFlag: boolean,
 };
 
+// データプールサーバーに送信するブロックデータの型定義
 type blockData = {
     id?: number,
     number: number,
@@ -72,26 +76,33 @@ type blockData = {
     timestampReadable?: string,
 }
 
+// blockDataを格納する配列の型定義
 type blockDataArray = Array<blockData>;
 
+// データプールサーバーに送信する集計データの型定義
 type netStats = basicNetStats & Pick<numberOfAddress, "numberOfAddress">;
 
+// netStatsを格納する配列の型定義
 type netStatsArray = Array<netStats>;
 
+// データプールサーバーから発行される"requestBlockDetail"イベントで受け取るデータの型定義
 type requestBlockDetail = {
     number: number,
     frontendId: string,
 }
 
+// データプールサーバーから発行される"requestBlockList"イベントで受け取るデータの型定義
 type requestBlockList = {
     pageOffset: number,
     frontendId: string,
 }
 
+// データプールサーバーへ発行する”responseBlockDetail”イベントで送信するデータの型定義
 type responseBlockDetail = Pick<requestBlockDetail, "frontendId"> & blockData & {
     noRecord: boolean,
 };
 
+// データプールサーバーへ発行する"responseBlockList"イベントで送信するデータの型定義
 type responseBlockList = {
     list: Array<blockData>,
     latestBlockNumber: number,
@@ -104,11 +115,13 @@ type responseBlockList = {
     frontendId: string,
 }
 
+// データプールサーバーから発行される"requestBlockListPageByBlockNumber"イベントで受け取るデータの型定義
 type requestBlockListPageByBlockNumber = {
     blockNumber: number,
     frontendId: string,
 };
 
+// データプールサーバーへ発行する"responseBLockListPageByBlockNumber"イベントで送信するデータの型定義
 type responseBlockListPageByBlockNumber = responseBlockList;
 
 export type {

@@ -5,8 +5,8 @@
     "typescript": "^4.8.3"
   },
   "dependencies": {
-    "@pierogi.dev/get_mysql_connection": "^1.0.4",
-    "@pierogi.dev/readable_time": "^1.0.6",
+    "@ethereum_net_stats/get_mysql_connection": "^1.0.8",
+    "@ethereum_net_stats/readable_time": "^1.0.7",
     "dotenv": "^16.0.2",
     "socket.io": "^4.5.2"
   },
