@@ -2,8 +2,9 @@
 socketServerは、主に以下の動作をします。
 - 各データレコーダーから発行されるソケットイベントの中継
 - 各データレコーダーによる集計データのデータプールへの送信
-- データプールサーバーから発行されるイベントに応じてMySQLデータベースからデータを取得して応答する
-socketServerは、MySQLとの通信には[Node MySQL 2](https://github.com/sidorares/node-mysql2#readme)を使用し、その他の通信には[sokcet.io](https://socket.io/)を使用します。
+- データプールサーバーから発行されるイベントに応じてMySQLデータベースからデータを取得して応答する  
+
+なお、socketServerは、MySQLとの通信には[Node MySQL 2](https://github.com/sidorares/node-mysql2#readme)を使用し、その他の通信には[sokcet.io](https://socket.io/)を使用しています。
 
 # 事前準備
 事前に以下のことを完了して下さい。
@@ -16,8 +17,8 @@ socketServerは、MySQLとの通信には[Node MySQL 2](https://github.com/sidor
 ### ソースコード
 ソースコードを確認したい場合は、以下のソースコードを確認して下さい。
 - メイン：[socketServer.ts]()
-- socket.ioのイベント定義：[socketEvents.ts]
-- 型定義：[types.ts]
+- socket.ioのイベント定義：[socketEvents.ts](https://github.com/ethereumNetStats/socketServer/blob/main/types/socketEvents.ts)
+- 型定義：[types.ts](https://github.com/ethereumNetStats/socketServer/blob/main/types/types.ts)
 
 ## 使い方
 以下では、ubuntu server v22.04での使用例を説明します。  
