@@ -14,11 +14,9 @@ socketServerは、主に以下の動作をします。
 - [dailyBasicNetStatsRecorder](https://github.com/ethereumNetStats/dailyBasicNetStatsRecorder)の実行
 - [weeklyBasicNetStatsRecorder](https://github.com/ethereumNetStats/weeklyBasicNetStatsRecorder)の実行
 
-### ソースコード
+## ソースコード
 ソースコードを確認したい場合は、以下のソースコードを確認して下さい。
-- メイン：[socketServer.ts]()
-- socket.ioのイベント定義：[socketEvents.ts](https://github.com/ethereumNetStats/socketServer/blob/main/types/socketEvents.ts)
-- 型定義：[types.ts](https://github.com/ethereumNetStats/socketServer/blob/main/types/types.ts)
+- メイン：[socketServer.ts](https://github.com/ethereumNetStats/socketServer)
 
 ## 使い方
 以下では、ubuntu server v22.04での使用例を説明します。  
@@ -61,3 +59,24 @@ chmod 755 ./buildAndRunDockerImage.sh
 ```shell
 sudo ./buildAndRunDockerImage.sh
 ```
+## socketServerが扱うイベント
+### 中継イベント
+| 中継元                           | 中継イベント                        | 中継先                                                                                                                          |
+|-------------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| blockDataRecorder             | newBlockDataRecorded          | minutelyBasicNetStatsRecorder<br/>hourlyBasicNetStatsRecorder<br/>dailyBasicNetStatsRecorder<br/>weeklyBasicNetStatsRecorder |
+| minutelyBasicNetStatsRecorder | minutelyBasicNetStatsRecorded | dataPoolServer                                                                                                               |
+| hourlyBasicNetStatsRecorder   | hourlyBasicNetStatsRecorded   | dataPoolServer                                                                                                               |
+| dailyBasicNetStatsRecorder    | dailyBasicNetStatsRecorded    | dataPoolServer                                                                                                               |
+| weeklyBasicNetStatsRecorder   | weeklyBasicNetStatsRecorded   | dataPoolServer                                                                                                               |  
+
+### 要求イベント
+| 要求イベント                             | 要求元            | 応答イベント                             |
+|------------------------------------|----------------|------------------------------------|
+| requestInitialMinutelyNetStats     | dataPoolServer | initialMinutelyNetStats            |
+| requestInitialHourlyNetStats       | dataPoolServer | initialHourlyNetStats              |
+| requestInitialDailyNetStats        | dataPoolServer | initialDailyNetStats               |
+| requestInitialWeeklyNetStats       | dataPoolServer | initialWeeklyNetStats              |
+| requestInitialBlockData            | dataPoolServer | initialBlockData                   |
+| requestBlockDetail                 | dataPoolServer | responseBlockDetail                |
+| requestBlockList                   | dataPoolServer | responseBlockList                  |
+| requestBlockListPageByBlockNumber  | dataPoolServer | requestBlockListPageByBlockNumber  |

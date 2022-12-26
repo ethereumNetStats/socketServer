@@ -166,7 +166,7 @@ socketServer.on('connection', (client) => {
 
         // blockDataRecorderから通知されたブロックナンバーのブロックデータ（最新のブロックデータ）をデータベースから取得
         let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                        FROM blockData
+                                                                        FROM ethereum.blockData
                                                                         WHERE timestamp = ${blockNumberWithTimestamp.timestamp}`);
 
         let newBlockData: blockData = mysqlRes[0];
@@ -398,7 +398,7 @@ socketServer.on('connection', (client) => {
 
         // dataPoolServerへ送信する１時間ごとの集計データの初期データとして最新１日分のデータをデータベースから取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM hourlyBasicNetStats
+                                                                      FROM ethereum.hourlyBasicNetStats
                                                                       ORDER BY endTimeUnix DESC
                                                                       LIMIT 25`);
 
@@ -645,7 +645,7 @@ socketServer.on('connection', (client) => {
 
         // "blockData"テーブルから最新１０ブロック分のデータを取得
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM blockData
+                                                                      FROM ethereum.blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 10`);
 
@@ -665,7 +665,7 @@ socketServer.on('connection', (client) => {
 
         // ユーザーが詳細を要求したブロックナンバーを受信データから抽出して、当該ブロックナンバーのブロックデータをデータベースから取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM blockData
+                                                                      FROM ethereum.blockData
                                                                       WHERE number = ${requestBlockDetail.number}`);
 
         if (mysqlRes[0].length) {
@@ -714,7 +714,7 @@ socketServer.on('connection', (client) => {
 
         // 最初にデータベースにおける最新のブロックナンバーを取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
-                                                                      FROM blockData
+                                                                      FROM ethereum.blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 1`);
 
@@ -732,7 +732,7 @@ socketServer.on('connection', (client) => {
 
         // 要求されたページの全てのブロックデータをデータベースから取得
         mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM blockData
+                                                                  FROM ethereum.blockData
                                                                   WHERE number >= ${lastBlockNumber}
                                                                     AND number < ${topBlockNumber}
                                                                   ORDER BY number DESC`);
@@ -778,7 +778,7 @@ socketServer.on('connection', (client) => {
 
         // 最初にデータベースにおける最新のブロックナンバーを取得する
         let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
-                                                                      FROM blockData
+                                                                      FROM ethereum.blockData
                                                                       ORDER BY number DESC
                                                                       LIMIT 1`);
 
@@ -810,7 +810,7 @@ socketServer.on('connection', (client) => {
 
         // 特定したページに含まれるブロックデータをデータベースから取得
         mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM blockData
+                                                                  FROM ethereum.blockData
                                                                   WHERE number > ${bottomBlockNumber}
                                                                     AND number <= ${topBlockNumber}
                                                                   ORDER BY number DESC`);
