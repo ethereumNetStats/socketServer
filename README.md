@@ -14,11 +14,11 @@ socketServerは、主に以下の動作をします。
 - [dailyBasicNetStatsRecorder](https://github.com/ethereumNetStats/dailyBasicNetStatsRecorder)の実行
 - [weeklyBasicNetStatsRecorder](https://github.com/ethereumNetStats/weeklyBasicNetStatsRecorder)の実行
 
-## ソースコード
+# ソースコード
 ソースコードを確認したい場合は、以下のソースコードを確認して下さい。
-- メイン：[socketServer.ts](https://github.com/ethereumNetStats/socketServer)
+- メイン：https://github.com/ethereumNetStats/socketServer/blob/main/socketServer.ts
 
-## 使い方
+# 使い方
 以下では、ubuntu server v22.04での使用例を説明します。  
 まずこのレポジトリを`clone`します。
 ```shell
@@ -59,8 +59,8 @@ chmod 755 ./buildAndRunDockerImage.sh
 ```shell
 sudo ./buildAndRunDockerImage.sh
 ```
-## socketServerが扱うイベント
-### 中継イベント
+# socketServerが扱うイベント
+## 中継イベント
 | 中継元                           | 中継イベント                        | 中継先                                                                                                                          |
 |-------------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
 | blockDataRecorder             | newBlockDataRecorded          | minutelyBasicNetStatsRecorder<br/>hourlyBasicNetStatsRecorder<br/>dailyBasicNetStatsRecorder<br/>weeklyBasicNetStatsRecorder |
