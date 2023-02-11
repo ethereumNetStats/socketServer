@@ -7,6 +7,7 @@ import {Server} from "socket.io";
 // 自作パッケージのインポート
 import {currentTimeReadable, unixTimeReadable} from "@ethereum_net_stats/readable_time";
 import {getMysqlConnection, RowDataPacket} from "@ethereum_net_stats/get_mysql_connection";
+import {gethHttpClient} from "@ethereum_net_stats/get_geth_connections";
 
 // ソケットイベント定義のインポート
 import type {ClientToServerEvents, ServerToClientEvents} from "./types/socketEvents";
@@ -22,7 +23,11 @@ import type {
     responseBlockDetail,
     responseBlockList,
     requestBlockListPageByBlockNumber,
-    responseBlockListPageByBlockNumber, requestBlockDetail, requestBlockList,
+    responseBlockListPageByBlockNumber,
+    requestBlockDetail,
+    requestBlockList,
+    requestTransactionDetail,
+    responseTransactionDetail, transactionDetail,
 } from "./types/types";
 
 import type {Pool} from "@ethereum_net_stats/get_mysql_connection";
@@ -844,4 +849,23 @@ socketServer.on('connection', (client) => {
         console.log(`${currentTimeReadable()} | Emit : 'responseBlockListPageByBlockNumber' | To : dataPoolServer`);
     });
 
+    // 'requestTransactionDetail'をデータプールサーバーから受け取った時の処理
+    client.on('requestTransactionDetail', async (requestTransactionDetail: requestTransactionDetail) => {
+        console.log(`${currentTimeReadable()} | Receive : 'requestTransactionDetail' | From : dataPoolServer | Frontend ID : ${requestTransactionDetail.frontendId} | Transaction hash : ${requestTransactionDetail.transactionHash}`);
+
+        // ユーザーが詳細を要求したトランザクションハッシュを受信データから抽出して、当該トランザクションハッシュのトランザクションデータをデータベースから取得する
+        let gethRes: transactionDetail | null = await gethHttpClient.getTransaction(requestTransactionDetail.transactionHash);
+
+        // フロントエンドに送信する応答データの生成
+        let responseTransactionDetail: responseTransactionDetail = {
+            transactionDetail: gethRes,
+            frontendId: requestTransactionDetail.frontendId,
+            requestedTransactionHash: requestTransactionDetail.transactionHash,
+            error: gethRes ? "noError" : "noTransaction",
+        };
+
+        console.log(`${currentTimeReadable()} | Emit : 'responseTransactionDetail' | To : dataPoolServer | Frontend ID : ${responseTransactionDetail.frontendId} | Error : ${responseTransactionDetail.error}`);
+
+        socketServer.to(dataPoolServerId).emit("responseTransactionDetail", responseTransactionDetail);
+    });
 });

@@ -124,6 +124,40 @@ type requestBlockListPageByBlockNumber = {
 // データプールサーバーへ発行する"responseBLockListPageByBlockNumber"イベントで送信するデータの型定義
 type responseBlockListPageByBlockNumber = responseBlockList;
 
+// transactionデータの型定義
+type transactionDetail = {
+    hash: string,
+    nonce: number,
+    blockHash: string | null,
+    blockNumber: number | null,
+    transactionIndex: number | null,
+    from: string,
+    to: string | null,
+    input: string,
+    value: string,
+    gasPrice: string,
+    gas: number,
+    type?: number,
+    v?: string,
+    r?: string,
+    s?: string,
+    chainId?: string
+}
+
+// requestTransactionDetailのデータ型の定義
+type requestTransactionDetail = {
+    transactionHash: string,
+    frontendId: string,
+}
+
+// responseTransactionDetailのデータ型の定義
+type responseTransactionDetail = {
+    transactionDetail: transactionDetail | null,
+    requestedTransactionHash: string,
+    frontendId: string,
+    error: string,
+}
+
 export type {
     blockNumberWithTimestamp,
     basicNetStats,
@@ -137,5 +171,8 @@ export type {
     responseBlockList,
     requestBlockList,
     requestBlockListPageByBlockNumber,
-    responseBlockListPageByBlockNumber
+    responseBlockListPageByBlockNumber,
+    requestTransactionDetail,
+    responseTransactionDetail,
+    transactionDetail
 }

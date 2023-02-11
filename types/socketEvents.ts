@@ -9,7 +9,11 @@ import type {
     blockDataArray,
     requestBlockDetail,
     responseBlockDetail,
-    responseBlockList, requestBlockList, requestBlockListPageByBlockNumber, responseBlockListPageByBlockNumber
+    responseBlockList,
+    requestBlockList,
+    requestBlockListPageByBlockNumber,
+    responseBlockListPageByBlockNumber,
+    requestTransactionDetail, responseTransactionDetail
 } from "./types";
 
 // データレコーダー及びデータプールサーバーとのsocket.ioイベントのイベント名と引数の型を登録
@@ -41,6 +45,7 @@ type ClientToServerEvents = {
     requestBlockDetail: (requestBlockDetail: requestBlockDetail) => void,
     requestBlockList: (requestBlockList: requestBlockList) => void,
     requestBlockListPageByBlockNumber: (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) => void,
+    requestTransactionDetail: (requestTransactionDetail: requestTransactionDetail) => void,
 }
 
 // socketServerから各データレコーダー及びデータプールサーバーに発行するイベントの登録
@@ -68,6 +73,7 @@ type ServerToClientEvents = {
     responseBlockDetail: (responseBlockDetail: responseBlockDetail) => void,
     responseBlockList: (responseBlockList: responseBlockList) => void,
     responseBlockListPageByBlockNumber: (responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber) => void,
+    responseTransactionDetail: (responseTransactionDetail: responseTransactionDetail) => void,
 }
 
 export type {ClientToServerEvents, ServerToClientEvents}
