@@ -5,176 +5,105 @@ import 'dotenv/config'
 import { Server } from 'socket.io'
 
 // 自作パッケージのインポート
-import {
-  currentTimeReadable,
-  unixTimeReadable,
-} from '@ethereum_net_stats/readable_time'
-import type { Pool } from '@ethereum_net_stats/get_mysql_connection'
-import {
-  getMysqlConnection,
-  RowDataPacket,
-} from '@ethereum_net_stats/get_mysql_connection'
-import { gethHttpClient } from '@ethereum_net_stats/get_geth_connections'
-
+import { currentTimeReadable, unixTimeReadable } from '@ethereum_net_stats/readable_time'
+import { getMysqlConnection, RowDataPacket } from '@ethereum_net_stats/get_mysql_connection'
 // ソケットイベント定義のインポート
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-} from './types/socketEvents'
+import type { ClientToServerEvents, ServerToClientEvents } from './types/socketEvents'
 
 // 型定義のインポート
+import type { Pool } from '@ethereum_net_stats/get_mysql_connection'
 import type {
   basicNetStats,
-  blockData,
-  arrayOfBlockData,
   blockNumberWithTimestamp,
   requestBlockDetail,
   requestBlockList,
   requestBlockListPageByBlockNumber,
-  requestLatestData,
-  requestTransactionDetail,
+  requestTransactionSearch,
   responseBlockDetail,
-  responseBlockList,
-  responseBlockListPageByBlockNumber,
-  responseTransactionDetail,
-  transactionDetail,
-  latestData,
-  responseLatestData,
+  socketClientAttribute,
+  requestBlockSearch,
+  attribute,
+  numberOfAddress,
 } from './types/types'
 
-import getLatestData from './functions/getLatestData'
+// 各ソケットイベント受信時の処理関数のインポート
+import responseInitialMinutelyNetStats from './functions/responseInitialMinutelyNetStats.js'
+import responseInitialHourlyNetStats from './functions/responseInitialHourlyNetStats.js'
+import responseInitialDailyNetStats from './functions/responseInitialDailyNetStats.js'
+import responseInitialWeeklyNetStats from './functions/responseInitialWeeklyNetStats.js'
+import sendLatestOneBlockData from './functions/sendLatestOneBlockData.js'
+import sendLatest10BlockData from './functions/sendLatest10BlockData.js'
+import sendBlockList from './functions/sendBlockList.js'
+import sendBlockListPageByBlockNumber from './functions/sendBlockListPageByBlockNumber.js'
+import sendBlockSearchResult from './functions/sendBlockSearchResult.js'
+import sendTransactionSearchResult from './functions/sendTransactionSearchResult.js'
 
-const mysqlConnection: Pool = await getMysqlConnection(false)
+// basicNetStatsとaddressCountの同期用クラス'ensureLatestNetStats'のインポート
+import ensureLatestNetStats from './class/ensureLatestNetStats.js'
+// 各時間レンジのensureLatestNetStatsのインスタンスの生成
+let ensureLatestMinutelyNetStatsInstance: ensureLatestNetStats = new ensureLatestNetStats()
+let ensureLatestHourlyNetStatsInstance: ensureLatestNetStats = new ensureLatestNetStats()
+let ensureLatestDailyNetStatsInstance: ensureLatestNetStats = new ensureLatestNetStats()
+let ensureLatestWeeklyNetStatsInstance: ensureLatestNetStats = new ensureLatestNetStats()
+// 各時間レンジのensureLatestNetStatsのインスタンスの格納
+const ensureLatestNetStatsInstances = {
+  Minutely: ensureLatestMinutelyNetStatsInstance,
+  Hourly: ensureLatestHourlyNetStatsInstance,
+  Daily: ensureLatestDailyNetStatsInstance,
+  Weekly: ensureLatestWeeklyNetStatsInstance,
+}
+
+const mysqlConnection: Pool = getMysqlConnection(false, true)
 
 // socket.io-serverの起動
-const socketServer: Server<ClientToServerEvents, ServerToClientEvents> =
-  new Server(6000)
-
-// socket.io-clientのID格納用変数の初期化
-let minutelyBasicNetStatsMakerId: string = ''
-let hourlyBasicNetStatsMakerId: string = ''
-let dailyBasicNetStatsMakerId: string = ''
-let weeklyBasicNetStatsMakerId: string = ''
-
-let minutelyAddressCounterId: string = ''
-let hourlyAddressCounterId: string = ''
-let dailyAddressCounterId: string = ''
-let weeklyAddressCounterId: string = ''
+const socketServer: Server<ClientToServerEvents, ServerToClientEvents> = new Server(6000)
 
 let blockDataRecorderId: string = ''
 let addressRecorderId: string = ''
-let dataPoolServerId: string = ''
-
-// socket.io-clientの名前定義
-const minutelyBasicNetStatsMakerName: string = 'minutelyBasicNetStatsRecorder'
-const hourlyBasicNetStatsMakerName: string = 'hourlyBasicNetStatsRecorder'
-const dailyBasicNetStatsMakerName: string = 'dailyBasicNetStatsRecorder'
-const weeklyBasicNetStatsMakerName: string = 'weeklyBasicNetStatsRecorder'
-
-const minutelyAddressCounterName: string = 'minutelyAddressCounter'
-const hourlyAddressCounterName: string = 'hourlyAddressCounter'
-const dailyAddressCounterName: string = 'dailyAddressCounter'
-const weeklyAddressCounterName: string = 'weeklyAddressCounter'
+let dataPublisherId: string = ''
 
 const blockDataRecorderName: string = 'blockDataRecorder'
 const addressRecorderName: string = 'addressRecorder'
-const dataPoolServerName: string = 'dataPoolServer'
+const dataPublisherName: string = 'dataPublisher'
 
-// １分ごとの集計データの格納用変数の定義.
-// let minutelyBasicNetStatsDate: number | null;
-// let minutelyBasicNetStatsData: basicNetStats | null;
-// let minutelyAddressCountDate: number | null;
-// let minutelyAddressCountData: numberOfAddress | null;
+// netStatsのattributeを格納する配列を定義
+// これによりsocketイベントのエミットとリスンの処理をそれぞれまとめて記述できる
+const netStatsAttributeArray: Array<attribute> = ['Minutely', 'Hourly', 'Daily', 'Weekly']
+let netStatsRecorder: Array<socketClientAttribute> = []
+let addressCounter: Array<socketClientAttribute> = []
 
-// １時間ごとの集計データの格納用変数の定義
-// let hourlyBasicNetStatsDate: number | null;
-// let hourlyBasicNetStatsData: basicNetStats | null;
-// let hourlyAddressCountDate: number | null;
-// let hourlyAddressCountData: numberOfAddress | null;
-
-// １日ごとの集計データの格納用変数の定義
-// let dailyBasicNetStatsDate: number | null;
-// let dailyBasicNetStatsData: basicNetStats | null;
-// let dailyAddressCountDate: number | null;
-// let dailyAddressCountData: numberOfAddress | null;
-
-// １週間ごとの集計データの格納用変数の定義
-// let weeklyBasicNetStatsDate: number | null;
-// let weeklyBasicNetStatsData: basicNetStats | null;
-// let weeklyAddressCountDate: number | null;
-// let weeklyAddressCountData: numberOfAddress | null;
+// クライアントからのリクエストに対するレスポンス関数を格納するオブジェクト
+const responseFunctions = {
+  Minutely: responseInitialMinutelyNetStats,
+  Hourly: responseInitialHourlyNetStats,
+  Daily: responseInitialDailyNetStats,
+  Weekly: responseInitialWeeklyNetStats,
+}
 
 // ソケットサーバーのイベント登録
 socketServer.on('connection', (client) => {
-  console.log(
-    `${currentTimeReadable()} | Connect with a socket client. ID : ${
-      client.id
-    }`,
-  )
+  console.log(`${currentTimeReadable()} | Connect with a socket client. ID : ${client.id}`)
+
+  // クライアントのnameに応じてidをイベントemitterとイベントリスナーの配列に追加
+  if (client.handshake.query.attribute === 'netStatsRecorder') {
+    console.log(`${currentTimeReadable()} | Connect : ${client.handshake.query.name}`)
+    netStatsRecorder.push({ id: client.id, name: String(client.handshake.query.name) })
+    console.log(`${currentTimeReadable()} | New netStatsRecorder is connected`)
+    console.log(netStatsRecorder)
+  }
+
+  if (client.handshake.query.attribute === 'addressCounter') {
+    console.log(`${currentTimeReadable()} | Connect : ${client.handshake.query.name}`)
+    addressCounter.push({ id: client.id, name: String(client.handshake.query.name) })
+    console.log(`${currentTimeReadable()} | New addressCounter is connected`)
+    console.log(addressCounter)
+  }
 
   // クライアントから接続されたときにソケットIDを記録
   switch (client.handshake.query.name) {
-    case minutelyBasicNetStatsMakerName:
-      minutelyBasicNetStatsMakerId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${minutelyBasicNetStatsMakerName}`,
-      )
-      break
-
-    case hourlyBasicNetStatsMakerName:
-      hourlyBasicNetStatsMakerId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${hourlyBasicNetStatsMakerName}`,
-      )
-      break
-
-    case dailyBasicNetStatsMakerName:
-      dailyBasicNetStatsMakerId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${dailyBasicNetStatsMakerName}`,
-      )
-      break
-
-    case weeklyBasicNetStatsMakerName:
-      weeklyBasicNetStatsMakerId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${weeklyBasicNetStatsMakerName}`,
-      )
-      break
-
-    case minutelyAddressCounterName:
-      minutelyAddressCounterId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${minutelyAddressCounterName}`,
-      )
-      break
-
-    case hourlyAddressCounterName:
-      hourlyAddressCounterId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${hourlyAddressCounterName}`,
-      )
-      break
-
-    case dailyAddressCounterName:
-      dailyAddressCounterId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${dailyAddressCounterName}`,
-      )
-      break
-
-    case weeklyAddressCounterName:
-      weeklyAddressCounterId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${weeklyAddressCounterName}`,
-      )
-      break
-
     case blockDataRecorderName:
       blockDataRecorderId = client.id
-      console.log(
-        `${currentTimeReadable()} | Connect : ${blockDataRecorderName}`,
-      )
+      console.log(`${currentTimeReadable()} | Connect : ${blockDataRecorderName}`)
       break
 
     case addressRecorderName:
@@ -182,899 +111,210 @@ socketServer.on('connection', (client) => {
       console.log(`${currentTimeReadable()} | Connect : ${addressRecorderName}`)
       break
 
-    case dataPoolServerName:
-      dataPoolServerId = client.id
-      console.log(`${currentTimeReadable()} | Connect : ${dataPoolServerName}`)
+    case dataPublisherName:
+      dataPublisherId = client.id
+      console.log(`${currentTimeReadable()} | Connect : ${dataPublisherName}`)
       break
   }
-  // TODO newBlockDataRecordedイベントの処理を検討
-  // blockDataRecorderによって発行される"newBlockDataRecorded"イベントを受信した時の処理
-  client.on(
-    'newBlockDataRecorded',
-    async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
-      console.log(
-        `${currentTimeReadable()} | Receive : 'newBlockDataRecorded' | Block number : ${
-          blockNumberWithTimestamp.blockNumber &&
-          blockNumberWithTimestamp.blockNumber
-        } | Timestamp : ${
-          blockNumberWithTimestamp.timestamp &&
-          unixTimeReadable(blockNumberWithTimestamp.timestamp)
-        }`,
-      )
 
-      // "newBlockDataRecorded"イベントで受信したデータを各データレコーダーへ転送
-      socketServer
-        .to(minutelyBasicNetStatsMakerId)
-        .emit('newBlockDataRecorded', blockNumberWithTimestamp)
-      console.log(
-        `${currentTimeReadable()} | Proxy : blockDataRecorder -> minutelyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${
-          blockNumberWithTimestamp.blockNumber
-        } | Block timestamp : ${unixTimeReadable(
-          Number(blockNumberWithTimestamp.timestamp),
-        )}`,
-      )
-      socketServer
-        .to(hourlyBasicNetStatsMakerId)
-        .emit('newBlockDataRecorded', blockNumberWithTimestamp)
-      console.log(
-        `${currentTimeReadable()} | Proxy : blockDataRecorder -> hourlyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${
-          blockNumberWithTimestamp.blockNumber
-        } | Block timestamp : ${unixTimeReadable(
-          Number(blockNumberWithTimestamp.timestamp),
-        )}`,
-      )
-      socketServer
-        .to(dailyBasicNetStatsMakerId)
-        .emit('newBlockDataRecorded', blockNumberWithTimestamp)
-      console.log(
-        `${currentTimeReadable()} | Proxy : blockDataRecorder -> dailyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${
-          blockNumberWithTimestamp.blockNumber
-        } | Block timestamp : ${unixTimeReadable(
-          Number(blockNumberWithTimestamp.timestamp),
-        )}`,
-      )
-      socketServer
-        .to(weeklyBasicNetStatsMakerId)
-        .emit('newBlockDataRecorded', blockNumberWithTimestamp)
-      console.log(
-        `${currentTimeReadable()} | Proxy : blockDataRecorder -> weeklyBasicNetStatsMaker | Event : 'newBlockDataRecorded' | Block number : ${
-          blockNumberWithTimestamp.blockNumber
-        } | Block timestamp : ${unixTimeReadable(
-          Number(blockNumberWithTimestamp.timestamp),
-        )}`,
-      )
+  client.on('disconnect', () => {
+    // 切断したクライアントのattributeがnetStatsRecorderの場合にidを配列netStatsRecorderから削除
+    if (client.handshake.query.attribute === 'netStatsRecorder') {
+      console.log(`${currentTimeReadable()} | Disconnect : ${client.handshake.query.name}`)
+      netStatsRecorder = netStatsRecorder.filter((elem) => elem.id !== client.id)
+    }
+    // 切断したクライアントのattributeがaddressCounterの場合にidを配列addressCounterから削除
+    if (client.handshake.query.attribute === 'addressCounter') {
+      console.log(`${currentTimeReadable()} | Disconnect : ${client.handshake.query.name}`)
+      addressCounter = addressCounter.filter((elem) => elem.id !== client.id)
+    }
+    console.log(`${currentTimeReadable()} | netStatsRecorderArray : ${netStatsRecorder}`)
+    console.log(`${currentTimeReadable()} | addressCounterArray : ${addressCounter}`)
+  })
 
-      // blockDataRecorderから通知されたブロックナンバーのブロックデータ（最新のブロックデータ）をデータベースから取得
-      let [mysqlRes] = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                      FROM ethereum.blockData
-                                                                      WHERE timestamp = ${blockNumberWithTimestamp.timestamp}`)
+  // blockDataRecorderが新しいブロックデータを記録した時の処理
+  client.on('newBlockDataRecorded', async (blockNumberWithTimestamp: blockNumberWithTimestamp) => {
+    console.log(
+      `${currentTimeReadable()} | Receive : 'newBlockDataRecorded' | Block number : ${
+        blockNumberWithTimestamp.blockNumber && blockNumberWithTimestamp.blockNumber
+      } | Timestamp : ${
+        blockNumberWithTimestamp.timestamp && unixTimeReadable(blockNumberWithTimestamp.timestamp)
+      }`,
+    )
 
-      let newBlockData: blockData = mysqlRes[0]
-
-      // 最新のブロックデータをdataPoolServerに送信
-      socketServer.to(dataPoolServerId).emit('newBlockData', newBlockData)
+    // 新しいブロックデータを各データレコーダーへ転送
+    netStatsRecorder.map((elem) => {
+      socketServer.to(elem.id).emit('newBlockDataRecorded', blockNumberWithTimestamp)
       console.log(
-        `${currentTimeReadable()} | Emit : 'newBlockData' | To : dataPoolServer`,
+        `${currentTimeReadable()} | Proxy : blockDataRecorder -> ${
+          elem.name
+        } | Event : 'newBlockDataRecorded' | Block number : ${
+          blockNumberWithTimestamp.blockNumber
+        } | Block timestamp : ${unixTimeReadable(Number(blockNumberWithTimestamp.timestamp))}`,
       )
-    },
-  )
+    })
+  })
 
   // addressRecorderがアドレスのチェックを完了した通知を各addressRecorderに転送
-  client.on('addressChecked', (blockNumber: number) => {
-    socketServer
-      .to(minutelyAddressCounterId)
-      .emit('addressChecked', blockNumber)
+  client.on('addressChecked', (addressCheckedBlockNumber: number) => {
     console.log(
-      `${currentTimeReadable()} | Proxy : newAddressRecorder -> minutelyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`,
-    )
-    socketServer.to(hourlyAddressCounterId).emit('addressChecked', blockNumber)
-    console.log(
-      `${currentTimeReadable()} | Proxy : newAddressRecorder -> hourlyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`,
-    )
-    socketServer.to(dailyAddressCounterId).emit('addressChecked', blockNumber)
-    console.log(
-      `${currentTimeReadable()} | Proxy : newAddressRecorder -> dailyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`,
-    )
-    socketServer.to(weeklyAddressCounterId).emit('addressChecked', blockNumber)
-    console.log(
-      `${currentTimeReadable()} | Proxy : newAddressRecorder -> weeklyAddressCounter | Event : 'addressChecked' | Block number : ${blockNumber}`,
-    )
-  })
-
-  //
-  //Minutely events emitter and recorder
-  //"minutelyAddressCountRecorded" & "minutelyBasicNetStatsRecorded" are exclusive events.
-  //
-
-  //Listener for the minutely net stats.
-  // client.on("minutelyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Receive : 'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`);
-  //
-  //     minutelyBasicNetStatsData = recordOfEthDB;
-  //     minutelyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
-  //
-  //     if (minutelyBasicNetStatsData && minutelyAddressCountData) {
-  //         if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
-  //             let newMinutelyNetStats: netStats = {
-  //                 ...recordOfEthDB,
-  //                 numberOfAddress: minutelyAddressCountData.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
-  //             console.log(`${currentTimeReadable()} | Emit : minutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`);
-  //             minutelyBasicNetStatsData = null;
-  //             minutelyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  //Listener for the minutely address counter.
-  // client.on("minutelyAddressCountRecorded", (minutelyAddressCount: numberOfAddress) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Receive : 'minutelyAddressCountRecorded' | From : minutelyAddressCounter`);
-  //
-  //     minutelyAddressCountData = minutelyAddressCount;
-  //     minutelyAddressCountDate = minutelyAddressCount.startTimeUnix;
-  //
-  //     if (minutelyAddressCountData && minutelyBasicNetStatsData) {
-  //         if (minutelyBasicNetStatsDate === minutelyAddressCountDate) {
-  //             let newMinutelyNetStats: netStats = {
-  //                 ...minutelyBasicNetStatsData,
-  //                 numberOfAddress: minutelyAddressCount.numberOfAddress,
-  //             }
-  //             client.timeout(5000).to(dataPoolServerId).emit('newMinutelyNetStats', newMinutelyNetStats);
-  //             console.log(`${currentTimeReadable()} | Emit : 'newMinutelyNetStats' | To : dataPoolServer | Trigger event : 'minutelyAddressCountRecorded'`);
-  //             minutelyBasicNetStatsData = null;
-  //             minutelyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  // １分間のデータ集計が完了した時のイベント"minutelyBasicNetStatsRecorded"を受信した時の処理の登録
-  client.on('minutelyBasicNetStatsRecorded', (basicNetStats: basicNetStats) => {
-    console.log(
-      `${currentTimeReadable()} | Receive :'minutelyBasicNetStatsRecorded' | From : minutelyBasicNetStatsRecorder`,
+      `${currentTimeReadable()} | Receive : 'addressChecked' | Block number : ${addressCheckedBlockNumber}`,
     )
 
-    // dataPoolServerに受信したデータを転送
-    client.to(dataPoolServerId).emit('newMinutelyNetStats', basicNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : newMinutelyNetStats | To : dataPoolServer | Trigger event : 'minutelyBasicNetStatsRecorded'`,
+    addressCounter.map((elem) => {
+      socketServer.to(elem.id).emit('addressChecked', addressCheckedBlockNumber)
+      console.log(
+        `${currentTimeReadable()} | Proxy : addressRecorder -> ${
+          elem.name
+        } | Event : 'addressChecked' | Block number : ${addressCheckedBlockNumber}`,
+      )
+    })
+
+    // トップページ用の最新データをdataPublisherに送信
+    // （イベントの流れ：geth(newBlockHeaders)->javaAddressRecorder(addressChecked)->socketServer）
+    sendLatestOneBlockData(
+      socketServer,
+      dataPublisherId,
+      mysqlConnection,
+      addressCheckedBlockNumber,
     )
   })
 
-  //Listener for a socketClient of the dataPoolServer.
-  // client.on("requestInitialMinutelyNetStats", async () => {
-  //     console.log(`${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`);
-  //
-  //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                                   FROM minutelyAddressCount
-  //                                                                   ORDER BY endTimeUnix DESC
-  //                                                                   LIMIT 61`);
-  //
-  //     let minutelyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-  //
-  //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                               FROM ethereum.minutelyBasicNetStats
-  //                                                               WHERE endTimeUnix <= ${minutelyAddressCount[0].endTimeUnix}
-  //                                                               ORDER BY endTimeUnix DESC
-  //                                                               LIMIT 61`);
-  //
-  //     let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
-  //
-  //     let initialMinutelyNetStats: netStatsArray = [];
-  //
-  //     for (let i = 0; i < minutelyAddressCount.length; i++) {
-  //         initialMinutelyNetStats.push({
-  //             ...minutelyBasicInitialNetStats[i],
-  //             numberOfAddress: minutelyAddressCount[i].numberOfAddress,
-  //         });
-  //     }
-  //
-  //     initialMinutelyNetStats.reverse();
-  //
-  //     socketServer.to(dataPoolServerId).emit("initialMinutelyNetStats", initialMinutelyNetStats);
-  //     console.log(`${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`);
-  // });
-
-  // dataPoolServerが起動したときに発行する"requestInitialMinutelyNetStats"イベントを受信した時の処理の登録
-  client.on('requestInitialMinutelyNetStats', async () => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestMinutelyInitialNetStats' | From : dataPoolServer`,
-    )
-
-    // dataPoolServerへ送信する１分ごとの集計データの初期データとして最新１時間分のデータをデータベースから取得
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.minutelyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 61`)
-
-    // データベースの応答データから必要なデータを抽出
-    let minutelyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0]
-
-    // データが時系列順に並ぶように並び替え
-    minutelyBasicInitialNetStats.reverse()
-
-    // １分ごとの集計データの初期データをdataPoolServerに送信
-    socketServer
-      .to(dataPoolServerId)
-      .emit('initialMinutelyNetStats', minutelyBasicInitialNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'initialMinutelyNetStats' | To : dataPoolServer`,
-    )
+  // dataPublisherから各時間レンジのbasicNetStatsの初期データを要求された時の処理の登録
+  netStatsAttributeArray.map((attribute) => {
+    client.on(`requestInitial${attribute}NetStats`, async () => {
+      const responseFunction = responseFunctions[attribute]
+      if (responseFunction) {
+        await responseFunction(socketServer, dataPublisherId)
+      }
+    })
   })
 
-  //
-  //Hourly events emitter and recorder
-  //"hourlyAddressCountRecorded" & "hourlyBasicNetStatsRecorded" are exclusive events.
-  //
-
-  //Listener for the hourly net stats.
-  // client.on("hourlyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`);
-  //
-  //     hourlyBasicNetStatsData = recordOfEthDB;
-  //     hourlyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
-  //
-  //     if (hourlyBasicNetStatsData && hourlyAddressCountData) {
-  //         if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
-  //             let newHourlyNetStats: netStats = {
-  //                 ...recordOfEthDB,
-  //                 numberOfAddress: hourlyAddressCountData.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
-  //             hourlyBasicNetStatsData = null;
-  //             hourlyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  //Listener for the hourly address counter.
-  // client.on("hourlyAddressCountRecorded", (hourlyAddressCount: numberOfAddress) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Receive : 'hourlyAddressCountRecorded' | From : hourlyAddressCountRecorder`);
-  //
-  //     hourlyAddressCountData = hourlyAddressCount;
-  //     hourlyAddressCountDate = hourlyAddressCount.startTimeUnix;
-  //
-  //     if (hourlyAddressCountData && hourlyBasicNetStatsData) {
-  //         if (hourlyBasicNetStatsDate === hourlyAddressCountDate) {
-  //             let newHourlyNetStats: netStats = {
-  //                 ...hourlyBasicNetStatsData,
-  //                 numberOfAddress: hourlyAddressCount.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newHourlyNetStats', newHourlyNetStats);
-  //             console.log(`${currentTimeReadable()} | Emit : 'newHourlyNetStats' | To : dataPoolServer`);
-  //             hourlyBasicNetStatsData = null;
-  //             hourlyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  // １時間のデータ集計が完了した時のイベント"hourlyBasicNetStatsRecorded"を受信した時の処理の登録
-  client.on('hourlyBasicNetStatsRecorded', (basicNetStats: basicNetStats) => {
-    console.log(
-      `${currentTimeReadable()} | Received : 'hourlyBasicNetStatsRecorded' | From : hourlyBasicNetStatsRecorder`,
-    )
-
-    // dataPoolServerに受信したデータを転送
-    client.to(dataPoolServerId).emit('newHourlyNetStats', basicNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : newHourlyNetStats | To : dataPoolServer | Trigger event : 'hourlyBasicNetStatsRecorded'`,
-    )
+  // 各時間レンジのbasicNetStatsRecorderから新しいbasicNetStatsを受信した時の処理の登録
+  // 各時間レンジのaddressCounterから新しいaddressCounterを受信した時のイベントnew${attribute}AddressCountRecorded
+  // とは排他的関係にあるため、同じ時間レンジについて同時に発生することはない。排他的関係はensureLatestNetStatsクラスで保証。
+  netStatsAttributeArray.map((attribute) => {
+    client.on(`new${attribute}BasicNetStatsRecorded`, (recordOfEthDB: basicNetStats) => {
+      const ensureLatestNetStatsInstance = ensureLatestNetStatsInstances[attribute]
+      if (ensureLatestNetStatsInstance) {
+        ensureLatestNetStatsInstance.onBasicNetStatsRecorded(
+          client,
+          recordOfEthDB,
+          attribute,
+          dataPublisherId,
+        )
+      }
+    })
   })
 
-  //Listener for a socketClient of the dataPoolServer.
-  // client.on("requestInitialHourlyNetStats", async () => {
-  //     console.log(`${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`);
-  //
-  //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                                   FROM hourlyAddressCount
-  //                                                                   ORDER BY endTimeUnix DESC
-  //                                                                   LIMIT 25`);
-  //
-  //     let hourlyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-  //
-  //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                               FROM hourlyBasicNetStats
-  //                                                               WHERE endTimeUnix <= ${hourlyAddressCount[0].endTimeUnix}
-  //                                                               ORDER BY endTimeUnix DESC
-  //                                                               LIMIT 25`);
-  //
-  //     let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
-  //
-  //     let initialHourlyNetStats: netStatsArray = [];
-  //
-  //     for (let i = 0; i < hourlyAddressCount.length; i++) {
-  //         initialHourlyNetStats.push({
-  //             ...hourlyBasicInitialNetStats[i],
-  //             numberOfAddress: hourlyAddressCount[i].numberOfAddress,
-  //         });
-  //     }
-  //
-  //     initialHourlyNetStats.reverse();
-  //
-  //     socketServer.to(dataPoolServerId).emit("initialHourlyNetStats", initialHourlyNetStats);
-  //     console.log(`${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`);
-  // });
-
-  // dataPoolServerが起動したときに発行する"requestInitialHourlyNetStats"イベントを受信した時の処理の登録
-  client.on('requestInitialHourlyNetStats', async () => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestHourlyInitialNetStats' | From : dataPoolServer`,
-    )
-
-    // dataPoolServerへ送信する１時間ごとの集計データの初期データとして最新１日分のデータをデータベースから取得
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.hourlyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 25`)
-
-    // データベースの応答データから必要なデータを抽出
-    let hourlyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0]
-
-    // データが時系列順に並ぶように並び替え
-    hourlyBasicInitialNetStats.reverse()
-
-    // １時間ごとの集計データの初期データをdataPoolServerに送信
-    socketServer
-      .to(dataPoolServerId)
-      .emit('initialHourlyNetStats', hourlyBasicInitialNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'initialHourlyNetStats' | To : dataPoolServer`,
-    )
-  })
-
-  //
-  //Daily events emitter and recorder
-  //"dailyAddressCountRecorded" & "dailyBasicNetStatsRecorded" are exclusive events.
-  //
-
-  //Listener for the daily net stats.
-  // client.on("dailyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`);
-  //
-  //     dailyBasicNetStatsData = recordOfEthDB;
-  //     dailyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
-  //
-  //     if (dailyBasicNetStatsData && dailyAddressCountData) {
-  //         if (dailyBasicNetStatsDate === dailyAddressCountDate) {
-  //             let newDailyNetStats: netStats = {
-  //                 ...recordOfEthDB,
-  //                 numberOfAddress: dailyAddressCountData.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newHourlyNetStats', newDailyNetStats);
-  //             dailyBasicNetStatsData = null;
-  //             dailyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  //Listener for the daily address counter.
-  // client.on("dailyAddressCountRecorded", (dailyAddressCount: numberOfAddress) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Receive : 'dailyAddressCountRecorded' | From : dailyAddressCountRecorder`);
-  //
-  //     dailyAddressCountData = dailyAddressCount;
-  //     dailyAddressCountDate = dailyAddressCount.startTimeUnix;
-  //
-  //     if (dailyAddressCountData && dailyBasicNetStatsData) {
-  //         if (dailyBasicNetStatsDate === dailyAddressCountDate) {
-  //             let newDailyNetStats: netStats = {
-  //                 ...dailyBasicNetStatsData,
-  //                 numberOfAddress: dailyAddressCount.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newDailyNetStats', newDailyNetStats);
-  //             console.log(`${currentTimeReadable()} | Emit : 'newDailyNetStats' | To : dataPoolServer`);
-  //             dailyBasicNetStatsData = null;
-  //             dailyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  // １日のデータ集計が完了した時のイベント"dailyBasicNetStatsRecorded"を受信した時の処理の登録
-  client.on('dailyBasicNetStatsRecorded', (basicNetStats: basicNetStats) => {
-    console.log(
-      `${currentTimeReadable()} | Received : 'dailyBasicNetStatsRecorded' | From : dailyBasicNetStatsRecorder`,
-    )
-
-    // dataPoolServerに受信したデータを転送
-    client.to(dataPoolServerId).emit('newDailyNetStats', basicNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : newDailyNetStats | To : dataPoolServer | Trigger event : 'dailyBasicNetStatsRecorded'`,
-    )
-  })
-
-  //Listener for a socketClient of the dataPoolServer.
-  // client.on("requestInitialDailyNetStats", async () => {
-  //     console.log(`${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`);
-  //
-  //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                                   FROM dailyAddressCount
-  //                                                                   ORDER BY endTimeUnix DESC
-  //                                                                   LIMIT 8`);
-  //
-  //     let dailyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-  //
-  //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                               FROM ethereum.dailyBasicNetStats
-  //                                                               WHERE endTimeUnix <= ${dailyAddressCount[0].endTimeUnix}
-  //                                                               ORDER BY endTimeUnix DESC
-  //                                                               LIMIT 8`);
-  //
-  //     let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
-  //
-  //     let initialDailyNetStats: netStatsArray = [];
-  //
-  //     for (let i = 0; i < dailyAddressCount.length; i++) {
-  //         initialDailyNetStats.push({
-  //             ...dailyBasicInitialNetStats[i],
-  //             numberOfAddress: dailyAddressCount[i].numberOfAddress,
-  //         });
-  //     }
-  //
-  //     initialDailyNetStats.reverse();
-  //
-  //     socketServer.to(dataPoolServerId).emit("initialDailyNetStats", initialDailyNetStats);
-  //     console.log(`${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`);
-  // });
-
-  // dataPoolServerが起動したときに発行する"requestInitialDailyNetStats"イベントを受信した時の処理の登録
-  client.on('requestInitialDailyNetStats', async () => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestDailyInitialNetStats' | From : dataPoolServer`,
-    )
-
-    // dataPoolServerへ送信する１日ごとの集計データの初期データとして最新１週間分のデータをデータベースから取得
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.dailyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 8`)
-
-    // データベースの応答データから必要なデータを抽出
-    let dailyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0]
-
-    // データが時系列順に並ぶように並び替え
-    dailyBasicInitialNetStats.reverse()
-
-    // １日ごとの集計データの初期データをdataPoolServerに送信
-    socketServer
-      .to(dataPoolServerId)
-      .emit('initialDailyNetStats', dailyBasicInitialNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'initialDailyNetStats' | To : dataPoolServer`,
-    )
-  })
-
-  //
-  //Weekly events emitter and recorder
-  //"weeklyAddressCountRecorded" & "weeklyBasicNetStatsRecorded" are exclusive events.
-  //
-
-  //Listener for the weekly net stats.
-  // client.on("weeklyBasicNetStatsRecorded", (recordOfEthDB: basicNetStats) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`);
-  //
-  //     weeklyBasicNetStatsData = recordOfEthDB;
-  //     weeklyBasicNetStatsDate = recordOfEthDB.startTimeUnix;
-  //
-  //     if (weeklyBasicNetStatsData && weeklyAddressCountData) {
-  //         if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
-  //             let newDailyNetStats: netStats = {
-  //                 ...recordOfEthDB,
-  //                 numberOfAddress: weeklyAddressCountData.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newWeeklyNetStats', newDailyNetStats);
-  //             weeklyBasicNetStatsData = null;
-  //             weeklyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  //Listener for the weekly address counter.
-  // client.on("weeklyAddressCountRecorded", (weeklyAddressCount: numberOfAddress) => {
-  //
-  //     console.log(`${currentTimeReadable()} | Receive : 'weeklyAddressCountRecorded' | From : weeklyAddressCountRecorder`);
-  //
-  //     weeklyAddressCountData = weeklyAddressCount;
-  //     weeklyAddressCountDate = weeklyAddressCount.startTimeUnix;
-  //
-  //     if (weeklyAddressCountData && weeklyBasicNetStatsData) {
-  //         if (weeklyBasicNetStatsDate === weeklyAddressCountDate) {
-  //             let newWeeklyNetStats: netStats = {
-  //                 ...weeklyBasicNetStatsData,
-  //                 numberOfAddress: weeklyAddressCount.numberOfAddress,
-  //             }
-  //             client.to(dataPoolServerId).emit('newWeeklyNetStats', newWeeklyNetStats);
-  //             console.log(`${currentTimeReadable()} | Emit : 'newWeeklyNetStats' | To : dataPoolServer`);
-  //             weeklyBasicNetStatsData = null;
-  //             weeklyAddressCountData = null;
-  //         }
-  //     }
-  // });
-
-  // １週間のデータ集計が完了した時のイベント"weeklyBasicNetStatsRecorded"を受信した時の処理の登録
-  client.on('weeklyBasicNetStatsRecorded', (basicNetStats: basicNetStats) => {
-    console.log(
-      `${currentTimeReadable()} | Received : 'weeklyBasicNetStatsRecorded' | From : weeklyBasicNetStatsRecorder`,
-    )
-
-    // dataPoolServerに受信したデータを転送
-    client.to(dataPoolServerId).emit('newWeeklyNetStats', basicNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : newWeeklyNetStats | To : dataPoolServer | Trigger event : 'weeklyBasicNetStatsRecorded'`,
-    )
-  })
-
-  //Listener for a socketClient of the dataPoolServer.
-  // client.on("requestInitialWeeklyNetStats", async () => {
-  //     console.log(`${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`);
-  //
-  //     let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                                   FROM weeklyAddressCount
-  //                                                                   ORDER BY endTimeUnix DESC
-  //                                                                   LIMIT 25`);
-  //
-  //     let weeklyAddressCount: Array<numberOfAddress> = mysqlRes[0];
-  //
-  //     mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-  //                                                               FROM ethereum.weeklyBasicNetStats
-  //                                                               WHERE endTimeUnix <= ${weeklyAddressCount[0].endTimeUnix}
-  //                                                               ORDER BY endTimeUnix DESC
-  //                                                               LIMIT 25`);
-  //
-  //     let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0];
-  //
-  //     let initialWeeklyNetStats: netStatsArray = [];
-  //
-  //     for (let i = 0; i < weeklyAddressCount.length; i++) {
-  //         initialWeeklyNetStats.push({
-  //             ...weeklyBasicInitialNetStats[i],
-  //             numberOfAddress: weeklyAddressCount[i].numberOfAddress,
-  //         });
-  //     }
-  //
-  //     initialWeeklyNetStats.reverse();
-  //
-  //     socketServer.to(dataPoolServerId).emit("initialWeeklyNetStats", initialWeeklyNetStats);
-  //     console.log(`${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`);
-  // });
-
-  // dataPoolServerが起動したときに発行する"requestInitialWeeklyNetStats"イベントを受信した時の処理の登録
-  client.on('requestInitialWeeklyNetStats', async () => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestWeeklyInitialNetStats' | From : dataPoolServer`,
-    )
-
-    // dataPoolServerへ送信する１週間ごとの集計データの初期データとして最新２５週間分のデータをデータベースから取得
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.weeklyBasicNetStats
-                                                                  ORDER BY endTimeUnix DESC
-                                                                  LIMIT 25`)
-
-    // データベースの応答データから必要なデータを抽出
-    let weeklyBasicInitialNetStats: Array<basicNetStats> = mysqlRes[0]
-
-    // データが時系列順に並ぶように並び替え
-    weeklyBasicInitialNetStats.reverse()
-
-    // １週間ごとの集計データの初期データをdataPoolServerに送信
-    socketServer
-      .to(dataPoolServerId)
-      .emit('initialWeeklyNetStats', weeklyBasicInitialNetStats)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'initialWeeklyNetStats' | To : dataPoolServer`,
-    )
-  })
-
-  // dataPoolServerが起動したときに発行する"requestInitialBlockData"を受信した時の処理の登録
-  // この処理によってトップページの"Latest blocks"セクションの初期表示データがバックエンドから送信されます。
-  client.on('requestInitialBlockData', async () => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestInitialBlockData' | From : dataPoolServer`,
-    )
-
-    // "blockData"テーブルから最新１０ブロック分のデータを取得
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                  FROM ethereum.blockData
-                                                                  ORDER BY number DESC
-                                                                  LIMIT 10`)
-
-    // MySQLの応答データから必要なデータを抽出
-    let initialBlockData: arrayOfBlockData = mysqlRes[0]
-
-    // 抽出したデータをdataPoolServerに送信
-    socketServer.to(dataPoolServerId).emit('initialBlockData', initialBlockData)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'initialBlockData' | To : dataPoolServer`,
-    )
+  // 各時間レンジのaddressCounterから新しいnumberOfAddressを受信した時の処理の登録
+  // 各時間レンジのbasicNetStatsRecorderから新しいbasicNetStatsを受信した時のイベントnew${attribute}BasicNetStatsRecorded
+  // とは排他的関係にあるため、同じ時間レンジについて同時に発生することはない。排他的関係はensureLatestNetStatsクラスで保証。
+  netStatsAttributeArray.map((attribute) => {
+    client.on(`new${attribute}AddressCountRecorded`, (numberOfAddress: numberOfAddress) => {
+      const ensureLatestNetStatsInstance = ensureLatestNetStatsInstances[attribute]
+      if (ensureLatestNetStatsInstance) {
+        ensureLatestNetStatsInstance.onAddressCountRecorded(
+          client,
+          numberOfAddress,
+          attribute,
+          dataPublisherId,
+        )
+      }
+    })
   })
 
   // dataPoolServerから"requestBlockDetail"イベントを受信した時の処理の登録
   // この処理によってユーザーが"Latest Blocks"セクションのブロックナンバーをクリックした時、または"Block list"ページのブロックナンバーをクリックした時
   // に表示する"Block detail"ページの情報が送信されます。
-  client.on(
-    'requestBlockDetail',
-    async (requestBlockDetail: requestBlockDetail) => {
+  client.on('requestBlockDetail', async (requestBlockDetail: requestBlockDetail) => {
+    console.log(
+      `${currentTimeReadable()} | Receive : 'requestBlockDetail' | From : dataPoolServer | FrontendId : ${
+        requestBlockDetail.frontendId
+      }`,
+    )
+
+    // ユーザーが詳細を要求したブロックナンバーを受信データから抽出して、当該ブロックナンバーのブロックデータをデータベースから取得する
+    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
+                                                                  FROM ethereum.blockData
+                                                                  WHERE number = ${requestBlockDetail.number}`)
+
+    if (mysqlRes[0].length) {
+      // データベースからの応答が空でない場合に応答データから必要なデータを抽出
+      let responseBlockDetail: responseBlockDetail = mysqlRes[0][0]
+
+      // ユーザーのsocket.io-clientのIDを応答データに追加
+      responseBlockDetail.frontendId = requestBlockDetail.frontendId
+
+      // データが空でないことを示すフラグを応答データに追加
+      responseBlockDetail.noRecord = false
+
+      // 応答データをdataPoolServerに送信
+      socketServer.to(dataPublisherId).emit('responseBlockDetail', responseBlockDetail)
       console.log(
-        `${currentTimeReadable()} | Receive : 'requestBlockDetail' | From : dataPoolServer | FrontendId : ${
-          requestBlockDetail.frontendId
+        `${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${
+          responseBlockDetail.noRecord
         }`,
       )
+    } else {
+      // データベースからの応答が空の場合に空のデータを代入
+      let responseBlockDetail: responseBlockDetail = mysqlRes[0][0]
 
-      // ユーザーが詳細を要求したブロックナンバーを受信データから抽出して、当該ブロックナンバーのブロックデータをデータベースから取得する
-      let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                    FROM ethereum.blockData
-                                                                    WHERE number = ${requestBlockDetail.number}`)
+      // ユーザーのsocket.io-clientのIDを応答データに追加
+      responseBlockDetail.frontendId = requestBlockDetail.frontendId
 
-      if (mysqlRes[0].length) {
-        // データベースからの応答が空でない場合に応答データから必要なデータを抽出
-        let responseBlockDetail: responseBlockDetail = mysqlRes[0][0]
+      // データが空であることを示すフラグを応答データに追加
+      responseBlockDetail.noRecord = true
 
-        // ユーザーのsocket.io-clientのIDを応答データに追加
-        responseBlockDetail.frontendId = requestBlockDetail.frontendId
+      // 応答データをdataPoolServerに送信
+      socketServer.to(dataPublisherId).emit('responseBlockDetail', responseBlockDetail)
+      console.log(
+        `${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${
+          responseBlockDetail.noRecord
+        }`,
+      )
+    }
+  })
 
-        // データが空でないことを示すフラグを応答データに追加
-        responseBlockDetail.noRecord = false
-
-        // 応答データをdataPoolServerに送信
-        socketServer
-          .to(dataPoolServerId)
-          .emit('responseBlockDetail', responseBlockDetail)
-        console.log(
-          `${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${
-            responseBlockDetail.noRecord
-          }`,
-        )
-      } else {
-        // データベースからの応答が空の場合に空のデータを代入
-        let responseBlockDetail: responseBlockDetail = mysqlRes[0][0]
-
-        // ユーザーのsocket.io-clientのIDを応答データに追加
-        responseBlockDetail.frontendId = requestBlockDetail.frontendId
-
-        // データが空であることを示すフラグを応答データに追加
-        responseBlockDetail.noRecord = true
-
-        // 応答データをdataPoolServerに送信
-        socketServer
-          .to(dataPoolServerId)
-          .emit('responseBlockDetail', responseBlockDetail)
-        console.log(
-          `${currentTimeReadable()} | Emit : 'responseBlockDetail' | To : dataPoolServer | noRecord : ${
-            responseBlockDetail.noRecord
-          }`,
-        )
-      }
-    },
-  )
-
-  // dataPoolServerから"requestBlockList"イベントを受信した時の処理の登録
+  // dataPublisherから"requestBlockList"イベントを受信した時の処理の登録
   // これによりユーザーが"View all blocks"をクリックした時の"Block list"ページの初期表示データが送信されます。
   // "Block list"ページの初期表示ではrequestBlockList.pageOffset=0を受け取ります。
   // また、ユーザーがページ番号をクリックした時の表示データもこの処理によって送信されます。
   // ユーザーがページ番号をクリックしたときはrequestBlockList.pageOffsetにクリックしたページ番号が設定されています。
-  client.on('requestBlockList', async (requestBlockList: requestBlockList) => {
-    console.log(
-      `${currentTimeReadable()} | Receive : 'requestBlockList' | From : dataPoolServer`,
-    )
-
-    // １ページ当たりの表示データ数の定義
-    const itemsPerPage: number = 25
-
-    // 最初にデータベースにおける最新のブロックナンバーを取得する
-    let mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT number
-                                                                  FROM ethereum.blockData
-                                                                  ORDER BY number DESC
-                                                                  LIMIT 1`)
-
-    // データベースの応答データから最新のブロックナンバーを抽出
-    let latestBlockNumber: number = mysqlRes[0][0].number
-
-    // 最新のブロックナンバーと１ページ当たりの表示データ数からトータルページ数を計算
-    let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage)
-
-    // 要求されたページの最初のブロックナンバーを計算
-    let topBlockNumber: number =
-      latestBlockNumber - itemsPerPage * requestBlockList.pageOffset
-
-    // 要求されたページの最後のブロックナンバーを計算
-    let lastBlockNumber: number = topBlockNumber - itemsPerPage
-
-    // 要求されたページの全てのブロックデータをデータベースから取得
-    mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                              FROM ethereum.blockData
-                                                              WHERE number >= ${lastBlockNumber}
-                                                                AND number < ${topBlockNumber}
-                                                              ORDER BY number DESC`)
-
-    // 応答データを格納する変数の初期化
-    let responseBlockList: responseBlockList = {
-      itemsPerPage: 0,
-      lastBlockNumber: 0,
-      latestBlockNumber: 0,
-      list: [],
-      pageOffset: 0,
-      topBlockNumber: 0,
-      totalPage: 0,
-      currentPage: 0,
-      frontendId: '',
-    }
-
-    // 応答データに実データを代入
-    responseBlockList.list = mysqlRes[0]
-    responseBlockList.latestBlockNumber = latestBlockNumber
-    responseBlockList.totalPage = totalPage
-    responseBlockList.currentPage = requestBlockList.pageOffset
-    responseBlockList.topBlockNumber = topBlockNumber
-    responseBlockList.lastBlockNumber = lastBlockNumber
-    responseBlockList.itemsPerPage = itemsPerPage
-    responseBlockList.pageOffset = requestBlockList.pageOffset
-    responseBlockList.frontendId = requestBlockList.frontendId
-
-    // 応答データを送信
-    socketServer
-      .to(dataPoolServerId)
-      .emit('responseBlockList', responseBlockList)
-    console.log(
-      `${currentTimeReadable()} | Emit : 'responseBlockList' | To : dataPoolServer`,
-    )
-  })
+  client.on(
+    'requestBlockList',
+    async (requestBlockList: requestBlockList) =>
+      await sendBlockList(requestBlockList, mysqlConnection, socketServer, dataPublisherId),
+  )
 
   // dataPoolServerから"requestBlockListPageByNumber"イベントを受信した時の処理の登録
   // これにより"Block list"ページでユーザーが入力したブロックナンバーのブロック情報を含むページのデータが送信されます。
   client.on(
     'requestBlockListPageByBlockNumber',
-    async (
-      requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber,
-    ) => {
-      console.log(
-        `${currentTimeReadable()} | Input block number : ${
-          requestBlockListPageByBlockNumber.blockNumber
-        }`,
-      )
-
-      // １ページ当たりの表示データ数の定義
-      const itemsPerPage: number = 25
-
-      // 最初にデータベースにおける最新のブロックナンバーを取得する
-      let mysqlRes = await mysqlConnection.query<
-        RowDataPacket[0]
-      >(`SELECT number
-         FROM ethereum.blockData
-         ORDER BY number DESC
-         LIMIT 1`)
-
-      // データベースの応答データから最新のブロックナンバーを抽出
-      let latestBlockNumber: number = mysqlRes[0][0].number
-
-      console.log(
-        `${currentTimeReadable()} | latestBlockNumber : ${latestBlockNumber}`,
-      )
-
-      // 最新のブロックナンバーと１ページ当たりの表示データ数からトータルページ数を計算
-      let totalPage: number = Math.ceil(latestBlockNumber / itemsPerPage)
-
-      console.log(`${currentTimeReadable()} | totalPage : ${totalPage}`)
-
-      // ユーザーが入力したブロック番号を含むページを特定するための変数の定義
-      let pageNumber: number = 1
-      let topBlockNumber: number = latestBlockNumber
-      let bottomBlockNumber: number = topBlockNumber - itemsPerPage
-
-      // ユーザーが入力したブロック番号を含むページと、当該ページの最初及び最後のブロックナンバーを特定
-      while (
-        !(
-          requestBlockListPageByBlockNumber.blockNumber <= topBlockNumber &&
-          requestBlockListPageByBlockNumber.blockNumber > bottomBlockNumber
-        )
-      ) {
-        topBlockNumber -= itemsPerPage
-        bottomBlockNumber -= itemsPerPage
-        ++pageNumber
-      }
-
-      console.log(`${currentTimeReadable()} | pageNumber : ${pageNumber}`)
-      console.log(
-        `${currentTimeReadable()} | topBlockNumberTest : ${topBlockNumber}`,
-      )
-      console.log(
-        `${currentTimeReadable()} | bottomBlockNumberTest : ${bottomBlockNumber}`,
-      )
-
-      // 特定したページに含まれるブロックデータをデータベースから取得
-      mysqlRes = await mysqlConnection.query<RowDataPacket[0]>(`SELECT *
-                                                                FROM ethereum.blockData
-                                                                WHERE number > ${bottomBlockNumber}
-                                                                  AND number <= ${topBlockNumber}
-                                                                ORDER BY number DESC`)
-
-      // 応答データを格納する変数の初期化
-      let responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber =
-        {
-          itemsPerPage: 0,
-          lastBlockNumber: 0,
-          latestBlockNumber: 0,
-          list: [],
-          pageOffset: 0,
-          topBlockNumber: 0,
-          totalPage: 0,
-          currentPage: 0,
-          frontendId: '',
-        }
-
-      // 応答データに実データを代入
-      responseBlockListPageByBlockNumber.list = mysqlRes[0]
-      responseBlockListPageByBlockNumber.latestBlockNumber = latestBlockNumber
-      responseBlockListPageByBlockNumber.totalPage = totalPage
-      responseBlockListPageByBlockNumber.currentPage = pageNumber
-      responseBlockListPageByBlockNumber.topBlockNumber = topBlockNumber
-      responseBlockListPageByBlockNumber.lastBlockNumber = bottomBlockNumber
-      responseBlockListPageByBlockNumber.itemsPerPage = itemsPerPage
-      responseBlockListPageByBlockNumber.pageOffset = pageNumber
-      responseBlockListPageByBlockNumber.frontendId =
-        requestBlockListPageByBlockNumber.frontendId
-
-      // 応答データをdataPoolServerに送信
-      socketServer
-        .to(dataPoolServerId)
-        .emit('responseBlockList', responseBlockListPageByBlockNumber)
-      console.log(
-        `${currentTimeReadable()} | Emit : 'responseBlockListPageByBlockNumber' | To : dataPoolServer`,
-      )
-    },
+    async (requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber) =>
+      await sendBlockListPageByBlockNumber(
+        requestBlockListPageByBlockNumber,
+        mysqlConnection,
+        socketServer,
+        dataPublisherId,
+      ),
   )
 
-  // 'requestTransactionDetail'をデータプールサーバーから受け取った時の処理
+  // 'requestTransactionSearch'をデータパブリッシャーから受け取った時の処理
   client.on(
-    'requestTransactionDetail',
-    async (requestTransactionDetail: requestTransactionDetail) => {
-      console.log(
-        `${currentTimeReadable()} | Receive : 'requestTransactionDetail' | From : dataPoolServer | Frontend ID : ${
-          requestTransactionDetail.frontendId
-        } | Transaction hash : ${requestTransactionDetail.transactionHash}`,
-      )
-
-      // ユーザーが詳細を要求したトランザクションハッシュを受信データから抽出して、当該トランザクションハッシュのトランザクションデータをデータベースから取得する
-      let gethRes: transactionDetail | null =
-        await gethHttpClient.getTransaction(
-          requestTransactionDetail.transactionHash,
-        )
-
-      // フロントエンドに送信する応答データの生成
-      let responseTransactionDetail: responseTransactionDetail = {
-        transactionDetail: gethRes,
-        frontendId: requestTransactionDetail.frontendId,
-        requestedTransactionHash: requestTransactionDetail.transactionHash,
-        error: gethRes ? 'noError' : 'noTransaction',
-      }
-
-      console.log(
-        `${currentTimeReadable()} | Emit : 'responseTransactionDetail' | To : dataPoolServer | Frontend ID : ${
-          responseTransactionDetail.frontendId
-        } | Error : ${responseTransactionDetail.error}`,
-      )
-
-      socketServer
-        .to(dataPoolServerId)
-        .emit('responseTransactionDetail', responseTransactionDetail)
-    },
+    'requestTransactionSearch',
+    async (requestTransactionSearch: requestTransactionSearch) =>
+      sendTransactionSearchResult(requestTransactionSearch, socketServer, dataPublisherId),
   )
 
   client.on(
-    'requestLatestData',
-    async (requestLatestData: requestLatestData) => {
-      let latestData: latestData = await getLatestData()
-      let responseLatestData: responseLatestData = {
-        latestData: latestData,
-        frontendId: requestLatestData.frontendId,
-      }
-      socketServer
-        .to(dataPoolServerId)
-        .emit('responseLatestData', responseLatestData)
-    },
+    'requestLatest10BlockData',
+    async (): Promise<void> =>
+      sendLatest10BlockData(socketServer, dataPublisherId, mysqlConnection),
+  )
+
+  // 'requestBlockSearch'をデータパブリッシャーから受け取った時の処理
+  client.on('requestBlockSearch', async (requestBlockSearch: requestBlockSearch) =>
+    sendBlockSearchResult(requestBlockSearch, socketServer, dataPublisherId),
   )
 })

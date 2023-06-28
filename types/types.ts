@@ -1,3 +1,9 @@
+// web3@1.9.0でmixHashの型定義がweb3.eth.getBlock()の戻り値に含まれていないので追加
+import type { BlockTransactionString } from 'web3-eth'
+type BlockTransactionStringWithMixHash = BlockTransactionString & {
+  mixHash: string
+}
+
 // blockDataRecorderから受け取るデータ型の定義
 type blockNumberWithTimestamp = {
   blockNumber: number | undefined
@@ -39,6 +45,9 @@ type basicNetStats = {
   gasUsedPerBlock: number
   noRecordFlag: boolean
 }
+
+// basicNetStatsを格納する配列の型定義
+type basicNetStatsArray = Array<basicNetStats>
 
 // addressCounterから受け取るデータの型定義
 type numberOfAddress = {
@@ -85,6 +94,12 @@ type netStats = basicNetStats & Pick<numberOfAddress, 'numberOfAddress'>
 // netStatsを格納する配列の型定義
 type netStatsArray = Array<netStats>
 
+type attribute = 'Minutely' | 'Hourly' | 'Daily' | 'Weekly'
+
+type netStatsWithAttribute = {
+  [key in attribute]?: basicNetStatsArray & { attribute?: attribute }
+}
+
 // データプールサーバーから発行される"requestBlockDetail"イベントで受け取るデータの型定義
 type requestBlockDetail = {
   number: number
@@ -104,7 +119,7 @@ type responseBlockDetail = Pick<requestBlockDetail, 'frontendId'> &
   }
 
 // データプールサーバーへ発行する"responseBlockList"イベントで送信するデータの型定義
-type responseBlockList = {
+type blockList = {
   list: Array<blockData>
   latestBlockNumber: number
   totalPage: number
@@ -123,7 +138,7 @@ type requestBlockListPageByBlockNumber = {
 }
 
 // データプールサーバーへ発行する"responseBLockListPageByBlockNumber"イベントで送信するデータの型定義
-type responseBlockListPageByBlockNumber = responseBlockList
+type responseBlockListPageByBlockNumber = blockList
 
 // transactionデータの型定義
 type transactionDetail = {
@@ -145,14 +160,14 @@ type transactionDetail = {
   chainId?: string
 }
 
-// requestTransactionDetailのデータ型の定義
-type requestTransactionDetail = {
+// requestTransactionSearchのデータ型の定義
+type requestTransactionSearch = {
   transactionHash: string
   frontendId: string
 }
 
-// responseTransactionDetailのデータ型の定義
-type responseTransactionDetail = {
+// transactionSearchResultのデータ型の定義
+type transactionSearchResult = {
   transactionDetail: transactionDetail | null
   requestedTransactionHash: string
   frontendId: string
@@ -189,11 +204,28 @@ type blockDataWithNewAddressCountAndTps = blockDataWithNewAddressCount & {
   tps: number
 }
 
-type latestData = Array<blockDataWithNewAddressCountAndTps>
+type latestBlockData = Array<blockDataWithNewAddressCountAndTps>
 
 type responseLatestData = {
-  latestData: latestData
+  latestBlockData: latestBlockData
+  latestTransactionData?: Array<transactionDetail>
   frontendId?: string
+}
+
+type socketClientAttribute = {
+  name: string
+  emitterTrigger?: string
+  listenerTrigger?: string
+  id: string
+}
+
+type requestBlockSearch = {
+  blockNumber: number
+  frontendId: string
+}
+
+type resultOfBlockSearch = BlockTransactionStringWithMixHash & {
+  frontendId: string
 }
 
 export type {
@@ -206,12 +238,12 @@ export type {
   arrayOfBlockData,
   requestBlockDetail,
   responseBlockDetail,
-  responseBlockList,
+  blockList,
   requestBlockList,
   requestBlockListPageByBlockNumber,
   responseBlockListPageByBlockNumber,
-  requestTransactionDetail,
-  responseTransactionDetail,
+  requestTransactionSearch,
+  transactionSearchResult,
   transactionDetail,
   requestLatestData,
   uniqueAddress,
@@ -220,6 +252,13 @@ export type {
   blockDataWithNewAddressCount,
   blockDataWithNewAddressCountArray,
   blockDataWithNewAddressCountAndTps,
-  latestData,
+  latestBlockData,
   responseLatestData,
+  socketClientAttribute,
+  requestBlockSearch,
+  resultOfBlockSearch,
+  BlockTransactionStringWithMixHash,
+  attribute,
+  netStatsWithAttribute,
+  basicNetStatsArray,
 }

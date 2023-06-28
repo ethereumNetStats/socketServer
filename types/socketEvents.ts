@@ -9,38 +9,36 @@ import type {
   arrayOfBlockData,
   requestBlockDetail,
   responseBlockDetail,
-  responseBlockList,
+  blockList,
   requestBlockList,
   requestBlockListPageByBlockNumber,
   responseBlockListPageByBlockNumber,
-  requestTransactionDetail,
-  responseTransactionDetail,
+  requestTransactionSearch,
   requestLatestData,
-  latestData,
   responseLatestData,
+  requestBlockSearch,
+  resultOfBlockSearch,
 } from './types'
 
 // データレコーダー及びデータプールサーバーとのsocket.ioイベントのイベント名と引数の型を登録
 type ClientToServerEvents = {
   // 各データレコーダーから発行されるイベントの登録
-  newBlockDataRecorded: (
-    blockNumberWithTimestamp: blockNumberWithTimestamp,
-  ) => void
+  newBlockDataRecorded: (blockNumberWithTimestamp: blockNumberWithTimestamp) => void
   addressChecked: (blockNumber: number) => void
 
-  minutelyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
-  minutelyAddressCountRecorded: (minutelyAddressCount: numberOfAddress) => void
+  newMinutelyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
+  newMinutelyAddressCountRecorded: (minutelyAddressCount: numberOfAddress) => void
 
-  hourlyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
-  hourlyAddressCountRecorded: (hourlyAddressCount: numberOfAddress) => void
+  newHourlyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
+  newHourlyAddressCountRecorded: (hourlyAddressCount: numberOfAddress) => void
 
-  dailyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
-  dailyAddressCountRecorded: (dailyAddressCount: numberOfAddress) => void
+  newDailyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
+  newDailyAddressCountRecorded: (dailyAddressCount: numberOfAddress) => void
 
-  weeklyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
-  weeklyAddressCountRecorded: (weeklyAddressCount: numberOfAddress) => void
+  newWeeklyBasicNetStatsRecorded: (basicNetStats: basicNetStats) => void
+  newWeeklyAddressCountRecorded: (weeklyAddressCount: numberOfAddress) => void
 
-  // データプールサーバーから発行されるイベントの登録
+  // データパブリッシャーから発行されるイベントの登録
   requestInitialMinutelyNetStats: () => void
   requestInitialHourlyNetStats: () => void
   requestInitialDailyNetStats: () => void
@@ -51,18 +49,15 @@ type ClientToServerEvents = {
   requestBlockListPageByBlockNumber: (
     requestBlockListPageByBlockNumber: requestBlockListPageByBlockNumber,
   ) => void
-  requestTransactionDetail: (
-    requestTransactionDetail: requestTransactionDetail,
-  ) => void
-  requestLatestData: (requestLatestData: requestLatestData) => void
+  requestTransactionSearch: (requestTransactionSearch: requestTransactionSearch) => void
+  requestLatest10BlockData: (requestLatest10Data: requestLatestData) => void
+  requestBlockSearch: (requestBlockSearch: requestBlockSearch) => void
 }
 
 // socketServerから各データレコーダー及びデータプールサーバーに発行するイベントの登録
 type ServerToClientEvents = {
   // 各データレコーダーに発行するイベントの登録
-  newBlockDataRecorded: (
-    blockNumberWithTimestamp: blockNumberWithTimestamp,
-  ) => void
+  newBlockDataRecorded: (blockNumberWithTimestamp: blockNumberWithTimestamp) => void
   addressChecked: (blockNumber: number) => void
 
   // データプールサーバーに発行するイベントの登録
@@ -82,14 +77,13 @@ type ServerToClientEvents = {
   newBlockData: (blockData: blockData) => void
 
   responseBlockDetail: (responseBlockDetail: responseBlockDetail) => void
-  responseBlockList: (responseBlockList: responseBlockList) => void
+  responseBlockList: (responseBlockList: blockList) => void
   responseBlockListPageByBlockNumber: (
     responseBlockListPageByBlockNumber: responseBlockListPageByBlockNumber,
   ) => void
-  responseTransactionDetail: (
-    responseTransactionDetail: responseTransactionDetail,
-  ) => void
   responseLatestData: (responseLatestData: responseLatestData) => void
+
+  resultOfBlockSearch: (resultOfBlockSearch: resultOfBlockSearch) => void
 }
 
 export type { ClientToServerEvents, ServerToClientEvents }
